@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0f172a;
+}
+
+/* Map fills its sized parent; parent sets height for phone + desktop. */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0b1220;
+  font: inherit;
+}
