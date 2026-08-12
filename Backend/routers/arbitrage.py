@@ -35,6 +35,7 @@ class BriefingAgentCard(BaseModel):
     name: str = Field(default="", max_length=128)
     phone: str = Field(default="", max_length=32)
     license_id: str = Field(default="", max_length=64)
+    role: str = Field(default="", max_length=128)
 
 
 class RouteBriefingRequest(BaseModel):
@@ -55,6 +56,11 @@ class RouteBriefingRequest(BaseModel):
         default_factory=list,
         max_length=8,
     )
+    destination_contacts: list[BriefingAgentCard] = Field(
+        default_factory=list,
+        max_length=8,
+    )
+    agents_status: str | None = Field(default=None, max_length=32)
     agent_name: str | None = Field(default=None, max_length=128)
     price_date: str | None = Field(default=None, max_length=32)
 
@@ -100,6 +106,7 @@ def get_crop_arbitrage(
             "message": result.get("message", ""),
             "agents_status": result["agents_status"],
             "max_staleness_days": result.get("max_staleness_days"),
+            "enam_helpline": result.get("enam_helpline"),
             "routes": result["routes"],
         }
     except HTTPException:

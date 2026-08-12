@@ -32,6 +32,27 @@ def _allow_seed_fallback() -> bool:
         "on",
     }
 
+# Government e-NAM mandi directory (no per-mandi deep link — user picks state/APMC).
+ENAM_MANDI_PORTAL_URL = "https://enam.gov.in/web/apmc-contact-details"
+ENAM_HELPLINE = "18002700224"
+
+# Agmarknet market name hint for the e-NAM mandi picker (matches ingest map keys).
+ENAM_APMC_SEARCH: dict[str, str] = {
+    "Khanna": "Khanna APMC",
+    "Sirsa": "Sirsa APMC",
+    "Agra": "Agra APMC",
+    "Lasalgaon": "Lasalgaon",
+    "Vashi": "Mumbai-Onion & Potato Market",
+    "Pune": "Pune",
+    "Indore": "Indore",
+    "Mandsaur": "Mandsaur",
+    "Jaipur": "Jaipur (F&V)",
+    "Gondal": "Gondal(Veg.market Gondal) APMC",
+    "Surat": "Surat APMC",
+    "Bengaluru": "Bengaluru",
+    "Howrah": "Ramkrishanpur(Howrah) APMC",
+}
+
 # Drop a mandi from pairing if its newest quote is older than this.
 DEFAULT_MAX_STALENESS_DAYS = 3
 
@@ -77,6 +98,13 @@ class ArbitrageOpportunity:
     destination_coordinates: list[float]
     # Commission agents waiting at the destination market (who to call on arrival).
     destination_verified_agents: list[dict[str, Any]]
+    # Government-published APMC office contacts for the destination yard.
+    destination_contacts: list[dict[str, Any]]
+    destination_profile_url: str | None
+    destination_maps_url: str | None
+    destination_contact_source: str | None
+    destination_enam_url: str | None
+    destination_enam_apmc_search: str | None
     # Arrival dates may differ across yards; never mix quotes from other days
     # for the *same* mandi, but source vs dest can legitimately be different days.
     source_price_date: str
@@ -84,6 +112,57 @@ class ArbitrageOpportunity:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+def _contact_bundle(mandi: Mandi) -> dict[str, Any]:
+    """Extract official APMC contacts stored on the mandi row."""
+    raw = mandi.official_contacts or {}
+    if isinstance(raw, list):
+        return {
+            "contacts": raw,
+            "profile_url": None,
+            "maps_url": None,
+            "source": None,
+        }
+    return {
+        "contacts": list(raw.get("contacts") or []),
+        "profile_url": raw.get("profile_url"),
+        "maps_url": raw.get("maps_url"),
+        "source": raw.get("source"),
+        "enam_url": raw.get("enam_url") or ENAM_MANDI_PORTAL_URL,
+        "enam_apmc_search": raw.get("enam_apmc_search"),
+    }
+
+
+def _mandi_short_key(mandi: Mandi) -> str | None:
+    """Match ingest short names used in ENAM_APMC_SEARCH."""
+    name_norm = mandi.name.lower()
+    for key in ENAM_APMC_SEARCH:
+        if key.lower() in name_norm:
+            return key
+    return None
+
+
+def _enam_search_label(mandi: Mandi, bundle: dict[str, Any]) -> str:
+    if bundle.get("enam_apmc_search"):
+        return str(bundle["enam_apmc_search"])
+    short = _mandi_short_key(mandi)
+    if short:
+        return ENAM_APMC_SEARCH[short]
+    return mandi.name.replace(" APMC", "").strip()
+
+
+def _maps_url_for(mandi: Mandi, db_session: Session) -> str | None:
+    bundle = _contact_bundle(mandi)
+    if bundle.get("maps_url"):
+        return str(bundle["maps_url"])
+    try:
+        latlng = _leaflet_latlng(db_session, mandi)
+    except ValueError:
+        return None
+    lat, lng = latlng
+    label = mandi.name.replace(" ", "+")
+    return f"https://maps.google.com/?q={lat},{lng}({label})"
 
 
 def _leaflet_latlng(db_session: Session, mandi: Mandi) -> list[float]:
@@ -162,6 +241,10 @@ def _evaluate_pair(
     if net_profit <= 0:
         return None
 
+    dest_bundle = _contact_bundle(destination.mandi)
+    profile_url = dest_bundle.get("profile_url")
+    maps_url = _maps_url_for(destination.mandi, db_session)
+
     return ArbitrageOpportunity(
         crop_name=crop_name,
         source_mandi=source.mandi.name,
@@ -179,6 +262,12 @@ def _evaluate_pair(
         source_coordinates=_leaflet_latlng(db_session, source.mandi),
         destination_coordinates=_leaflet_latlng(db_session, destination.mandi),
         destination_verified_agents=list(destination.mandi.verified_agents or []),
+        destination_contacts=list(dest_bundle.get("contacts") or []),
+        destination_profile_url=profile_url,
+        destination_maps_url=maps_url,
+        destination_contact_source=dest_bundle.get("source"),
+        destination_enam_url=dest_bundle.get("enam_url"),
+        destination_enam_apmc_search=_enam_search_label(destination.mandi, dest_bundle),
         source_price_date=source.price_date.isoformat(),
         destination_price_date=destination.price_date.isoformat(),
     )
@@ -287,16 +376,58 @@ def _select_current_prices(
     return [], "none", "no_fresh_prices"
 
 
+def _curated_agents(raw: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """
+    Only agents stamped with verified_at (admin-curated) are callable in live mode.
+    Seed demo cards lack that field and must never surface as real contacts.
+    """
+    curated: list[dict[str, Any]] = []
+    for agent in raw or []:
+        if not isinstance(agent, dict):
+            continue
+        if not str(agent.get("verified_at") or "").strip():
+            continue
+        if not str(agent.get("phone") or "").strip():
+            continue
+        curated.append(
+            {
+                "name": str(agent.get("name") or "").strip(),
+                "phone": str(agent.get("phone") or "").strip(),
+                "license_id": str(agent.get("license_id") or "").strip(),
+            }
+        )
+    return curated
+
+
 def _attach_agents(
     opportunity: ArbitrageOpportunity,
     *,
     agents_status: str,
+    data_source: str,
 ) -> dict[str, Any]:
     payload = opportunity.to_dict()
-    if agents_status == "unavailable":
-        # Live markets: never surface seeded fiction as callable contacts.
+    official = payload.get("destination_contacts") or []
+    curated = _curated_agents(payload.get("destination_verified_agents"))
+
+    if data_source == "agmarknet":
+        if curated:
+            # Prefer real commission agents when an admin has curated them.
+            payload["agents_status"] = "verified"
+            payload["destination_verified_agents"] = curated
+        elif official:
+            payload["agents_status"] = "official"
+            payload["destination_verified_agents"] = []
+        else:
+            payload["agents_status"] = "unavailable"
+            payload["destination_verified_agents"] = []
+    elif agents_status == "demo":
+        payload["agents_status"] = "demo"
+        payload["destination_contacts"] = []
+    else:
+        payload["agents_status"] = agents_status
         payload["destination_verified_agents"] = []
-    payload["agents_status"] = agents_status
+        payload["destination_contacts"] = []
+
     return payload
 
 
@@ -363,11 +494,23 @@ def calculate_crop_arbitrage(
                 opportunities.append(opportunity)
 
     opportunities.sort(key=lambda item: item.net_profit, reverse=True)
+    routes = [
+        _attach_agents(
+            item,
+            agents_status=agents_status,
+            data_source=data_source_used,
+        )
+        for item in opportunities
+    ]
+    if data_source_used == "agmarknet":
+        statuses = {route.get("agents_status") for route in routes}
+        if "verified" in statuses:
+            agents_status = "verified"
+        elif "official" in statuses:
+            agents_status = "official"
+
     return {
-        "routes": [
-            _attach_agents(item, agents_status=agents_status)
-            for item in opportunities
-        ],
+        "routes": routes,
         "data_source_used": data_source_used,
         "status": "ok",
         "message": (
@@ -377,4 +520,5 @@ def calculate_crop_arbitrage(
         ),
         "agents_status": agents_status,
         "max_staleness_days": max_staleness_days,
+        "enam_helpline": ENAM_HELPLINE,
     }

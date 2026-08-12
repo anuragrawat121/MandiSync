@@ -58,9 +58,18 @@ def _current_season_context() -> str:
 def _first_agent_name(route_data: dict[str, Any]) -> str:
     """
     Never treat seeded fiction as a real person to call.
-    Live / unavailable / demo statuses all fall back to a generic label.
+    Official APMC office names from government directories are OK for guidance.
     """
     status = str(route_data.get("agents_status") or "").strip().lower()
+    if status == "verified":
+        agents = route_data.get("destination_verified_agents") or []
+        if agents and isinstance(agents[0], dict) and agents[0].get("name"):
+            return str(agents[0]["name"])
+    if status == "official":
+        contacts = route_data.get("destination_contacts") or []
+        if contacts and isinstance(contacts[0], dict) and contacts[0].get("name"):
+            return str(contacts[0]["name"])
+        return "the destination APMC office (confirm a licensed commission agent on arrival)"
     if status in {"unavailable", "demo", ""}:
         return "the destination APMC office (confirm a licensed commission agent on arrival)"
     if route_data.get("agent_name"):

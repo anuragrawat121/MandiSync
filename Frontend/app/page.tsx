@@ -8,6 +8,7 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ExternalLink,
   Loader2,
   MapPin,
   MessageCircle,
@@ -27,10 +28,12 @@ import {
   type ArbitrageRoute,
   type CropName,
   type LiveBriefing,
+  type MandiContact,
   type SourceState,
   type VerifiedAgent,
 } from "@/lib/types";
 import AudioBriefing from "@/components/AudioBriefing";
+import AgentIntroForm from "@/components/AgentIntroForm";
 
 /** Leaflet touches `window` — must never SSR. */
 const ArbitrageMap = dynamic(() => import("@/components/ArbitrageMap"), {
@@ -45,6 +48,44 @@ const ArbitrageMap = dynamic(() => import("@/components/ArbitrageMap"), {
 
 function digitsOnly(phone: string): string {
   return phone.replace(/\D/g, "");
+}
+
+function OfficialContactCard({ contact }: { contact: MandiContact }) {
+  const telHref = `tel:${digitsOnly(contact.phone)}`;
+  const waHref = `https://wa.me/${digitsOnly(contact.phone)}`;
+
+  return (
+    <article className="rounded-xl border border-emerald-500/30 bg-slate-900/90 p-4 shadow-lg shadow-black/20">
+      <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-300">
+        APMC office — government published
+      </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="font-display text-lg text-slate-50">{contact.name}</h3>
+          <p className="mt-1 text-sm text-slate-400">{contact.role}</p>
+          <p className="mt-2 text-sm text-slate-200">{contact.phone}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <a
+          href={telHref}
+          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+        >
+          <Phone className="h-4 w-4" />
+          Call
+        </a>
+        <a
+          href={waHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-500"
+        >
+          <MessageCircle className="h-4 w-4" />
+          WhatsApp
+        </a>
+      </div>
+    </article>
+  );
 }
 
 function AgentContactCard({
@@ -199,6 +240,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [liveBriefing, setLiveBriefing] = useState<LiveBriefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
+  const [enamHelpline, setEnamHelpline] = useState("18002700224");
 
   const fetchRoutes = useCallback(async (cropName: CropName) => {
     setLoading(true);
@@ -225,6 +267,9 @@ export default function HomePage() {
       setDataSourceUsed(data.data_source_used ?? null);
       setApiStatus(data.status ?? "ok");
       setApiMessage(data.message ?? null);
+      if (data.enam_helpline) {
+        setEnamHelpline(data.enam_helpline);
+      }
     } catch (err) {
       setRoutes([]);
       setAgentsStatus("unavailable");
@@ -275,6 +320,10 @@ export default function HomePage() {
               (selectedRoute.agents_status ?? agentsStatus) === "verified"
                 ? selectedRoute.destination_verified_agents
                 : [],
+            destination_contacts:
+              (selectedRoute.agents_status ?? agentsStatus) === "official"
+                ? selectedRoute.destination_contacts ?? []
+                : [],
           }),
           signal: controller.signal,
         });
@@ -318,31 +367,50 @@ export default function HomePage() {
     () => selectedRoute?.destination_verified_agents ?? [],
     [selectedRoute],
   );
+  const officialContacts = useMemo(
+    () => selectedRoute?.destination_contacts ?? [],
+    [selectedRoute],
+  );
   const routeAgentsStatus =
     selectedRoute?.agents_status ?? agentsStatus ?? "unavailable";
   const showDemoAgents = routeAgentsStatus === "demo" && agents.length > 0;
+  const showOfficialContacts =
+    (routeAgentsStatus === "official" || routeAgentsStatus === "verified") &&
+    officialContacts.length > 0;
+  const showVerifiedAgents =
+    routeAgentsStatus === "verified" && agents.length > 0;
 
   return (
     <main className="min-h-screen bg-slate-900 text-slate-100">
       <header className="border-b border-slate-800 px-4 py-4 sm:px-6 md:px-8">
-        <p className="text-xs uppercase tracking-[0.22em] text-sky-400">
-          MandiSync
-        </p>
-        <h1 className="font-display mt-1 text-xl text-slate-50 sm:text-2xl">
-          Crop Arbitrage
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
-          Pick your home state and crop to see corridors that start where you
-          farm. Net profit is an estimate after transit, ~7% mandi fees, and
-          spoilage risk — not a guaranteed payout.
-          {dataSourceUsed === "agmarknet"
-            ? " Prices are from live Agmarknet (gov API)."
-            : dataSourceUsed === "seed"
-              ? " Demo seed prices (ALLOW_SEED_FALLBACK is on)."
-              : apiStatus === "no_fresh_prices"
-                ? " No fresh Agmarknet prices right now."
-                : ""}
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.22em] text-sky-400">
+              MandiSync
+            </p>
+            <h1 className="font-display mt-1 text-xl text-slate-50 sm:text-2xl">
+              Crop Arbitrage
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
+              Pick your home state and crop to see corridors that start where you
+              farm. Net profit is an estimate after transit, ~7% mandi fees, and
+              spoilage risk — not a guaranteed payout.
+              {dataSourceUsed === "agmarknet"
+                ? " Prices are from live Agmarknet (gov API)."
+                : dataSourceUsed === "seed"
+                  ? " Demo seed prices (ALLOW_SEED_FALLBACK is on)."
+                  : apiStatus === "no_fresh_prices"
+                    ? " No fresh Agmarknet prices right now."
+                    : ""}
+            </p>
+          </div>
+          <a
+            href="/admin"
+            className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:border-amber-400/50 hover:text-amber-200"
+          >
+            Ops admin
+          </a>
+        </div>
       </header>
 
       {/* Phone-first: one scrolling column. Desktop: filters+routes | map+details */}
@@ -625,14 +693,120 @@ export default function HomePage() {
                   </p>
                 )}
 
+                {selectedRoute && (
+                  <div className="mb-4 rounded-xl border border-sky-500/25 bg-sky-950/20 px-4 py-3">
+                    <p className="text-xs uppercase tracking-[0.14em] text-sky-300">
+                      Find traders on e-NAM
+                    </p>
+                    <p className="mt-1 text-sm leading-relaxed text-slate-300">
+                      Search for{" "}
+                      <span className="font-medium text-slate-100">
+                        {selectedRoute.destination_enam_apmc_search ??
+                          selectedRoute.destination_mandi}
+                      </span>{" "}
+                      on the official e-NAM mandi directory, or call the national
+                      helpdesk.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href={
+                          selectedRoute.destination_enam_url ??
+                          "https://enam.gov.in/web/apmc-contact-details"
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-600"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        e-NAM mandi list
+                      </a>
+                      <a
+                        href={`tel:${enamHelpline}`}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-400"
+                      >
+                        <Phone className="h-4 w-4" />
+                        e-NAM helpline {enamHelpline}
+                      </a>
+                    </div>
+                  </div>
+                )}
+
                 {selectedRoute && routeAgentsStatus === "unavailable" && (
                   <p className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-4 text-sm leading-relaxed text-amber-100">
-                    We do not publish phone numbers for live markets yet. On
-                    arrival, confirm a licensed commission agent at the
-                    destination APMC office before unloading — do not rely on
-                    unverified contacts from any app.
+                    No official APMC phone number is loaded for this destination
+                    yet. On arrival, ask at the market committee office before
+                    unloading — do not rely on unverified contacts from any app.
                   </p>
                 )}
+
+                {selectedRoute && showVerifiedAgents && (
+                  <>
+                    <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-3 text-sm leading-relaxed text-emerald-100">
+                      Verified commission agents for this yard — curated by
+                      MandiSync after offline license checks. Still confirm
+                      unloading terms at the APMC office on arrival.
+                    </p>
+                    <div className="mb-4 grid gap-3">
+                      {agents.map((agent) => (
+                        <AgentContactCard
+                          key={`${agent.license_id}-${agent.phone}`}
+                          agent={agent}
+                          demo={false}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {selectedRoute && showOfficialContacts && (
+                  <>
+                    <p className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-4 py-3 text-sm leading-relaxed text-emerald-100">
+                      These numbers are from official APMC or state marketing
+                      board directories — market office staff, not individual
+                      commission agents. Confirm your unloading agent at the
+                      yard office on arrival.
+                      {selectedRoute.destination_contact_source && (
+                        <>
+                          {" "}
+                          Source: {selectedRoute.destination_contact_source}.
+                        </>
+                      )}
+                    </p>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {selectedRoute.destination_maps_url && (
+                        <a
+                          href={selectedRoute.destination_maps_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-400 hover:text-sky-200"
+                        >
+                          <MapPin className="h-4 w-4" />
+                          Open in Maps
+                        </a>
+                      )}
+                      {selectedRoute.destination_profile_url && (
+                        <a
+                          href={selectedRoute.destination_profile_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-400 hover:text-sky-200"
+                        >
+                          Official mandi page
+                        </a>
+                      )}
+                    </div>
+                    <div className="grid gap-3">
+                      {officialContacts.map((contact) => (
+                        <OfficialContactCard
+                          key={`${contact.name}-${contact.phone}`}
+                          contact={contact}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {selectedRoute && <AgentIntroForm route={selectedRoute} />}
 
                 {selectedRoute && showDemoAgents && (
                   <>
@@ -652,20 +826,6 @@ export default function HomePage() {
                     </div>
                   </>
                 )}
-
-                {selectedRoute &&
-                  routeAgentsStatus === "verified" &&
-                  agents.length > 0 && (
-                    <div className="grid gap-3">
-                      {agents.map((agent) => (
-                        <AgentContactCard
-                          key={`${agent.license_id}-${agent.phone}`}
-                          agent={agent}
-                          demo={false}
-                        />
-                      ))}
-                    </div>
-                  )}
               </div>
             </div>
           </div>

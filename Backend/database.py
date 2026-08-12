@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import os
 from contextlib import contextmanager
 
 from sqlalchemy import create_engine, text
@@ -5,9 +8,16 @@ from sqlalchemy.orm import sessionmaker
 
 from models import Base
 
-DATABASE_URL = "postgresql://postgres:mandisync_password@localhost:5432/mandisync_db"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:mandisync_password@localhost:5432/mandisync_db",
+)
 
-engine = create_engine(DATABASE_URL)
+# Railway/Render sometimes provide postgres:// — SQLAlchemy wants postgresql://
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://") :]
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
@@ -44,6 +54,17 @@ def ensure_crop_price_schema() -> None:
                 """
             )
         )
+        conn.execute(
+            text(
+                "ALTER TABLE mandis ADD COLUMN IF NOT EXISTS official_contacts JSONB DEFAULT '{}'::jsonb"
+            )
+        )
+
+
+def init_db() -> None:
+    """Create tables + apply additive schema. Call after Postgres is reachable."""
+    Base.metadata.create_all(bind=engine)
+    ensure_crop_price_schema()
 
 
 @contextmanager
@@ -55,5 +76,12 @@ def get_db():
         db.close()
 
 
-Base.metadata.create_all(bind=engine)
-ensure_crop_price_schema()
+# Local/dev import path: connect immediately. Docker entrypoint calls init_db()
+# after wait-for-db so cold starts do not crash the container.
+if os.getenv("SKIP_DB_INIT_ON_IMPORT", "").strip().lower() not in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}:
+    init_db()

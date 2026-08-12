@@ -20,8 +20,16 @@ export interface VerifiedAgent {
   license_id: string;
 }
 
+/** Government-published APMC office contact (not a licensed commission agent). */
+export interface MandiContact {
+  name: string;
+  phone: string;
+  role: string;
+  contact_type?: "apmc_office" | "commission_agent" | string;
+}
+
 /** How destination contacts should be treated in the UI. */
-export type AgentsStatus = "unavailable" | "demo" | "verified";
+export type AgentsStatus = "unavailable" | "demo" | "verified" | "official";
 
 export interface ArbitrageRoute {
   crop_name: string;
@@ -44,6 +52,14 @@ export interface ArbitrageRoute {
   /** Leaflet order: [latitude, longitude] */
   destination_coordinates: [number, number];
   destination_verified_agents: VerifiedAgent[];
+  /** Official APMC office contacts when agents_status is "official". */
+  destination_contacts?: MandiContact[];
+  destination_profile_url?: string | null;
+  destination_maps_url?: string | null;
+  destination_contact_source?: string | null;
+  /** e-NAM mandi directory — user picks state/APMC on the portal. */
+  destination_enam_url?: string | null;
+  destination_enam_apmc_search?: string | null;
   source_price_date?: string;
   destination_price_date?: string;
   agents_status?: AgentsStatus | string;
@@ -57,9 +73,11 @@ export interface ArbitrageResponse {
   /** "ok" or "no_fresh_prices" when Agmarknet is missing/stale in live mode. */
   status?: "ok" | "no_fresh_prices" | string;
   message?: string;
-  /** Live markets: unavailable. Seed demo (only if ALLOW_SEED_FALLBACK): demo. */
+  /** Live markets: official APMC office, unavailable, or demo seed. */
   agents_status?: AgentsStatus | string;
   max_staleness_days?: number;
+  /** Toll-free e-NAM helpdesk (1800 270 0224). */
+  enam_helpline?: string;
   routes: ArbitrageRoute[];
 }
 

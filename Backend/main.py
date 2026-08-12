@@ -10,7 +10,9 @@ from slowapi.errors import RateLimitExceeded
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from rate_limit import limiter, rate_limit_exceeded_handler
+from routers.admin import router as admin_router
 from routers.arbitrage import router as arbitrage_router
+from routers.leads import router as leads_router
 from security import parse_allowed_origins
 
 app = FastAPI(
@@ -32,6 +34,8 @@ app.add_middleware(
 )
 
 app.include_router(arbitrage_router, prefix="/api/arbitrage")
+app.include_router(leads_router, prefix="/api/leads")
+app.include_router(admin_router, prefix="/api/admin")
 
 
 @app.get("/health")

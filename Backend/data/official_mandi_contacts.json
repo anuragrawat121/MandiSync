@@ -1,0 +1,235 @@
+{
+  "updated_at": "2026-08-12",
+  "note": "Government-published APMC office contacts only — not individual commission agents unless listed on an official directory.",
+  "mandis": {
+    "Khanna": {
+      "source": "Punjab State Agricultural Marketing Board",
+      "source_url": "https://www.cityairnews.com/content/state-control-room-at-mandi-board-resolves-2046-telephonic-complaints-out-of-total-received-2257-so-far",
+      "profile_url": "https://mandipulse.com/server.php/mandi/punjab-ludhiana-khanna-apmc",
+      "contacts": [
+        {
+          "name": "Punjab Mandi Board — Ludhiana district desk",
+          "role": "District control room (Khanna APMC area)",
+          "phone": "01725101629",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Sirsa": {
+      "source": "Haryana State Agricultural Marketing Board",
+      "source_url": "https://hsamb.org.in/market-committees-with-phone-numbers",
+      "profile_url": "https://hsamb.org.in/market-committees-with-phone-numbers",
+      "contacts": [
+        {
+          "name": "Sirsa Market Committee office",
+          "role": "APMC office",
+          "phone": "01263252038",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Agra": {
+      "source": "UP Directorate of Agricultural Marketing",
+      "source_url": "https://www.indiacustomercare.com/directorate-agricultural-mktg-and-agri-foreign-trade-no",
+      "profile_url": "https://www.kisaanhelpline.com/mandi-list/agra",
+      "contacts": [
+        {
+          "name": "Naveen Galla Mandi Samiti, Agra",
+          "role": "APMC office",
+          "phone": "05622240322",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "Assistant Agricultural Marketing Officer, Agra circle",
+          "role": "District marketing officer",
+          "phone": "05622347561",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Lasalgaon": {
+      "source": "APMC Lasalgaon official website",
+      "source_url": "https://apmclasalgaon.com/eng/lasalgaon.php",
+      "profile_url": "https://apmclasalgaon.com/eng/contact.php",
+      "contacts": [
+        {
+          "name": "Mr. N. S. Wadhavane",
+          "role": "Secretary, APMC Lasalgaon",
+          "phone": "9922644424",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "APMC Lasalgaon office",
+          "role": "Landline",
+          "phone": "02550266013",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Vashi": {
+      "source": "Mumbai APMC official website",
+      "source_url": "https://www.mumbaiapmc.org/en/about-us-en/organizational-management-en",
+      "profile_url": "https://www.mumbaiapmc.org/contact/contact-details",
+      "contacts": [
+        {
+          "name": "Mr. Sharad Jare",
+          "role": "Secretary, Mumbai APMC (Vashi yard)",
+          "phone": "9820656529",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "Mumbai APMC administration",
+          "role": "Main office landline",
+          "phone": "02227888414",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Pune": {
+      "source": "APMC Pune official website",
+      "source_url": "https://apmcpune.in/en/contact-en/contact-details-en",
+      "profile_url": "https://apmcpune.in/en/contact-en/contact-details-en",
+      "contacts": [
+        {
+          "name": "APMC Pune — Gultekdi market yard",
+          "role": "Main office",
+          "phone": "02024262349",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "Dr. Rajaram Shivram Dhondkar",
+          "role": "Secretary, APMC Pune",
+          "phone": "02024272887",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Indore": {
+      "source": "MP State Agricultural Marketing (Mandi) Board",
+      "source_url": "https://mpmandiboard.in/index.php/contact-us/sub-mandies?catid=2%3Auncategorised&id=357%3A2019-03-28-10-22-12&view=article",
+      "profile_url": "https://www.kisaanhelpline.com/mandi-list/indore",
+      "contacts": [
+        {
+          "name": "Krishi Upaj Mandi Samiti, Indore",
+          "role": "Secretary office",
+          "phone": "07312412902",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Mandsaur": {
+      "source": "MP State Agricultural Marketing (Mandi) Board",
+      "source_url": "https://mpmandiboard.in/index.php/contact-us/sub-mandies?catid=2%3Auncategorised&id=358%3A2019-03-28-10-22-13&view=article",
+      "profile_url": "https://www.kisaanhelpline.com/mandi-list/mandsaur",
+      "contacts": [
+        {
+          "name": "Krishi Upaj Mandi Samiti, Mandsaur",
+          "role": "APMC office",
+          "phone": "07422255821",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "Shri Parvat Singh Sisodiya",
+          "role": "Secretary (per MP Mandi Board listing)",
+          "phone": "9926582922",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Jaipur": {
+      "source": "Rajasthan Directorate of Agriculture Marketing",
+      "source_url": "https://www.indiacustomercare.com/directorate-agriculture-marketing-contact-no",
+      "profile_url": "https://www.indiacustomercare.com/directorate-agriculture-marketing-contact-no",
+      "contacts": [
+        {
+          "name": "Jaipur (F&V) APMC office",
+          "role": "Market committee",
+          "phone": "01412981981",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "Jaipur (F&V) — mobile desk",
+          "role": "Official mobile (RSAMB directory)",
+          "phone": "9414398715",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Gondal": {
+      "source": "Gujarat State Agricultural Marketing Board",
+      "source_url": "https://www.inroffers.com/customer-care/gujarat-state-agricultural-marketing-board-gsamb-contact-no",
+      "profile_url": "https://www.inroffers.com/customer-care/gujarat-state-agricultural-marketing-board-gsamb-contact-no",
+      "contacts": [
+        {
+          "name": "APMC Gondal office",
+          "role": "Secretary (GSAMB directory)",
+          "phone": "9913300055",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "APMC Gondal landline",
+          "role": "Office phone",
+          "phone": "02825220871",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Surat": {
+      "source": "Gujarat State Agricultural Marketing Board",
+      "source_url": "https://www.indiacustomercare.com/director-of-agriculture-marketing--rural-finance-no",
+      "profile_url": "https://www.officedial.com/agricultural-produce-market-committee-surat/contact.htm",
+      "contacts": [
+        {
+          "name": "Shri Neelesh L. Thorat",
+          "role": "Secretary, APMC Surat",
+          "phone": "9824119366",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "APMC Surat office",
+          "role": "Landline",
+          "phone": "02612336453",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Bengaluru": {
+      "source": "APMC Yeshwanthpur public listing",
+      "source_url": "https://www.jupiteryellowdetail.com/search-by-listings/food-shops-/yeshwanthpur-/apmc/303843.jws",
+      "profile_url": "https://www.jupiteryellowdetail.com/search-by-listings/food-shops-/yeshwanthpur-/apmc/303843.jws",
+      "contacts": [
+        {
+          "name": "APMC Yeshwanthpur, Bengaluru",
+          "role": "Main office",
+          "phone": "08023371695",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "APMC Yeshwanthpur alternate line",
+          "role": "Office phone",
+          "phone": "08023373901",
+          "contact_type": "apmc_office"
+        }
+      ]
+    },
+    "Howrah": {
+      "source": "West Bengal State Agricultural Marketing Board",
+      "source_url": "https://wbagrimarketingboard.gov.in/ZRMC_1.html",
+      "profile_url": "https://wbagrimarketingboard.gov.in/ZRMC_1.html",
+      "contacts": [
+        {
+          "name": "Howrah Zilla Regulated Market Committee",
+          "role": "District RMC (Ramkrishanpur yard area)",
+          "phone": "8918634831",
+          "contact_type": "apmc_office"
+        },
+        {
+          "name": "WB State Agricultural Marketing Board",
+          "role": "State marketing board helpline",
+          "phone": "09147133228",
+          "contact_type": "apmc_office"
+        }
+      ]
+    }
+  }
+}

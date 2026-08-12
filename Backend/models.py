@@ -27,6 +27,8 @@ class Mandi(Base):
     coordinates = Column(Geometry(geometry_type="POINT", srid=4326), nullable=False)
     # Array of {name, phone, license_id} commission-agent contact cards.
     verified_agents = Column(JSON, nullable=False, default=list)
+    # Government-published APMC office contacts — see data/official_mandi_contacts.json.
+    official_contacts = Column(JSON, nullable=False, default=dict)
 
     crop_prices = relationship("CropPrice", back_populates="mandi")
 

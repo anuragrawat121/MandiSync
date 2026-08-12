@@ -42,3 +42,12 @@ Live mode does **not** fall back to seed data when Agmarknet is stale
 - UI: http://localhost:3000
 
 Put `GEMINI_API_KEY` and `AGMARKNET_API_KEY` in `Backend/.env` (never commit them).
+
+## Production deploy
+See **[DEPLOY.md](./DEPLOY.md)** — Docker Compose stack (`api` + PostGIS + `web` + daily ingest).
+
+```bash
+cp .env.production.example .env.production
+# edit secrets, then:
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
