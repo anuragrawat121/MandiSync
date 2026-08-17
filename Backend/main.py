@@ -24,11 +24,11 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
-# Exact origins from ALLOWED_ORIGINS, plus optional *.trycloudflare.com for free demos.
+# Exact origins from ALLOWED_ORIGINS, plus GitHub Pages project sites.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=parse_allowed_origins(),
-    allow_origin_regex=r"^https://[a-z0-9-]+\.(trycloudflare\.com|github\.io)$",
+    allow_origin_regex=r"^https://[a-z0-9-]+\.github\.io$",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*", "X-API-Key", "Content-Type"],
