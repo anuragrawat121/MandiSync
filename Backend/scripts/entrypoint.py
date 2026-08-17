@@ -13,11 +13,20 @@ def main() -> None:
     os.environ["PYTHONPATH"] = root
     env = os.environ.copy()
     run([sys.executable, "scripts/wait_for_db.py"], env=env)
+    run([sys.executable, "scripts/enable_postgis.py"], env=env)
     run(
         [sys.executable, "-c", "from database import init_db; init_db()"],
         env=env,
     )
     run([sys.executable, "scripts/bootstrap_data.py"], env=env)
+    if os.getenv("RUN_INGEST_LOOP", "").strip().lower() in {"1", "true", "yes", "on"}:
+        print("[entrypoint] starting ingest loop in background", flush=True)
+        subprocess.Popen(
+            [sys.executable, "scripts/ingest_loop.py"],
+            env=env,
+            start_new_session=True,
+        )
+    port = os.getenv("PORT", "8000")
     os.execvp(
         sys.executable,
         [
@@ -28,7 +37,7 @@ def main() -> None:
             "--host",
             "0.0.0.0",
             "--port",
-            "8000",
+            port,
             "--workers",
             "1",
         ],

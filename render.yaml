@@ -1,0 +1,36 @@
+# Render Blueprint: free FastAPI web service (sleeps after ~15 min idle).
+# Database stays on Supabase. Website stays on GitHub Pages.
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: mandisync-api
+    runtime: python
+    plan: free
+    rootDir: Backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python scripts/entrypoint.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: PYTHONPATH
+        value: "."
+      - key: SKIP_DB_INIT_ON_IMPORT
+        value: "true"
+      - key: RUN_INGEST_LOOP
+        value: "true"
+      - key: ALLOW_SEED_FALLBACK
+        value: "false"
+      - key: DB_WAIT_SECONDS
+        value: "180"
+      - key: DATABASE_URL
+        sync: false
+      - key: API_KEY
+        sync: false
+      - key: AGMARKNET_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

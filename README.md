@@ -43,8 +43,11 @@ Live mode does **not** fall back to seed data when Agmarknet is stale
 
 Put `GEMINI_API_KEY` and `AGMARKNET_API_KEY` in `Backend/.env` (never commit them).
 
-## Production deploy
-See **[DEPLOY.md](./DEPLOY.md)** — Docker Compose stack (`api` + PostGIS + `web` + daily ingest).
+## Production deploy (free)
+See **[DEPLOY.md](./DEPLOY.md)** — **GitHub Pages (UI) + Render (API) + Supabase (PostGIS)**.
+The API sleeps after ~15 minutes idle; the first visit can take 30–60 seconds.
+
+Local Docker still works for your PC:
 
 ```bash
 cp .env.production.example .env.production

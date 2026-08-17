@@ -1,80 +1,135 @@
-# Deploy MandiSync
+# Deploy MandiSync — free stack (GitHub Pages + Render + Supabase)
 
-## Option A — Docker Compose on a VPS (recommended first deploy)
+Hugging Face **Docker / Gradio Spaces are paid** now. Do not use them.
 
-Works on any Linux VPS with Docker (DigitalOcean, Hetzner, AWS Lightsail, etc.).
+₹0 path:
 
-### 1. Server prep
-```bash
-# Ubuntu example
-sudo apt update && sudo apt install -y docker.io docker-compose-v2 git
-sudo usermod -aG docker $USER   # then re-login
-```
+| Piece | Host |
+|-------|------|
+| Website | GitHub Pages |
+| API + daily ingest | Render free web service |
+| Database | Supabase Postgres + PostGIS |
 
-### 2. Clone & configure
-```bash
-git clone https://github.com/anuragrawat121/MandiSync.git
-cd MandiSync
-cp .env.production.example .env.production
-nano .env.production
-```
+**Catch:** Render **sleeps after ~15 minutes** with no visitors. The next open can take 30–60 seconds. Supabase can **pause** after about a week unused — click **Resume**.
 
-Set at least:
-- `POSTGRES_PASSWORD` — strong random string
-- `API_KEY` — strong random string (same value used by the UI)
-- `AGMARKNET_API_KEY` — from data.gov.in
-- `GEMINI_API_KEY` — optional, for live briefings
-- `NEXT_PUBLIC_API_BASE_URL` — public API URL, e.g. `http://YOUR_SERVER_IP:8000`
-- `ALLOWED_ORIGINS` — public UI origin, e.g. `http://YOUR_SERVER_IP:3000`
-
-### 3. Build & run
-```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-```
-
-### 4. Verify
-```bash
-curl http://YOUR_SERVER_IP:8000/health
-# open http://YOUR_SERVER_IP:3000
-# admin: http://YOUR_SERVER_IP:3000/admin
-```
-
-### 5. Logs
-```bash
-docker compose -f docker-compose.prod.yml logs -f api ingest web
-```
-
-Services:
-| Service | Role |
-|---------|------|
-| `db` | PostGIS |
-| `api` | FastAPI (seeds mandis + official contacts on first boot) |
-| `ingest` | Daily Agmarknet pull |
-| `web` | Next.js UI |
-
-### HTTPS later
-Put Caddy/Nginx in front of `:3000` and `:8000`, then update `ALLOWED_ORIGINS` and rebuild `web` with the HTTPS API URL.
+Do this order: **Supabase → Render → GitHub Pages**.
 
 ---
 
-## Option B — Local production smoke test
-```powershell
-cd MandiSync
-copy .env.production.example .env.production
-# edit .env.production with your real keys
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+## 1. Supabase — free database
+
+1. Open https://supabase.com → log in with GitHub
+2. **New project** → name `mandisync` → invent a database password and **save it** → plan **Free**
+3. Wait until **Active**
+4. Left menu → **SQL Editor** → **New query** → **Run**:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS postgis;
+```
+
+5. **Project Settings** (gear) → **Database** → connection **URI**
+6. Use **Direct connection** (port **5432**, host like `db.xxxxx.supabase.co`)
+   - Do **not** use port **6543**
+7. Copy into Notepad:
+
+```text
+postgresql://postgres:YOUR_PASSWORD@db.xxxxx.supabase.co:5432/postgres
 ```
 
 ---
 
-## Option C — Split cloud (later)
-- **Frontend** → Vercel (set `NEXT_PUBLIC_API_BASE_URL` + `NEXT_PUBLIC_API_KEY`)
-- **API + ingest** → Railway/Render Docker from `Backend/`
-- **Database** → managed Postgres **with PostGIS** (Railway plugin, or Supabase with PostGIS, or Neon + extension)
+## 2. Render — free API (not Hugging Face)
 
-PostGIS is required — plain Postgres without the extension will fail distance queries.
+1. Open https://render.com → **Get Started** → log in with **GitHub**
+2. **New +** → **Web Service**
+3. Connect repo **`anuragrawat121/MandiSync`**
+4. Fill:
+
+| Field | Value |
+|-------|--------|
+| Name | `mandisync-api` |
+| Language / Runtime | **Python 3** |
+| Branch | `main` |
+| **Root Directory** | `Backend` |
+| Build command | `pip install -r requirements.txt` |
+| Start command | `python scripts/entrypoint.py` |
+| Instance type | **Free** |
+
+5. **Environment variables** (Add):
+
+| Name | Value |
+|------|--------|
+| `DATABASE_URL` | Supabase URI from step 1 |
+| `API_KEY` | long random secret (same value on GitHub Pages) |
+| `AGMARKNET_API_KEY` | data.gov.in key, or empty until the portal is back |
+| `ALLOWED_ORIGINS` | `https://anuragrawat121.github.io` |
+| `ALLOW_SEED_FALLBACK` | `false` |
+| `SKIP_DB_INIT_ON_IMPORT` | `true` |
+| `RUN_INGEST_LOOP` | `true` |
+| `PYTHONPATH` | `.` |
+| `DB_WAIT_SECONDS` | `180` |
+
+6. Click **Deploy Web Service**
+7. Wait until deploy is **Live** (5–10 minutes)
+8. Render shows a URL like:
+
+```text
+https://mandisync-api.onrender.com
+```
+
+9. Open:
+
+```text
+https://mandisync-api.onrender.com/health
+```
+
+You want `{"status":"ok"}`.
+
+First request after sleep can be slow. If `/health` fails, open **Logs**.
+
+Common log problems:
+
+- Supabase paused → Resume in Supabase, then **Manual Deploy** on Render
+- Wrong `DATABASE_URL` or used port 6543
+- PostGIS missing → re-run the SQL in step 1
 
 ---
 
-## Rotate keys
-If `API_KEY`, `GEMINI_API_KEY`, or `AGMARKNET_API_KEY` ever appeared in chat or git history, rotate them before a public deploy.
+## 3. GitHub Pages — free website
+
+Push latest `main` first (this repo must include the Pages workflow).
+
+1. GitHub repo → **Settings** → **Secrets and variables** → **Actions**
+2. Add:
+
+| Name | Value |
+|------|--------|
+| `NEXT_PUBLIC_API_BASE_URL` | `https://mandisync.onrender.com` (your real Render URL, no slash) |
+| `NEXT_PUBLIC_API_KEY` | **same** as Render `API_KEY` |
+
+3. **Settings** → **Pages** → Source: **GitHub Actions**
+4. **Actions** → **Deploy GitHub Pages** → **Run workflow**
+
+Site: `https://anuragrawat121.github.io/MandiSync/`  
+Admin: `https://anuragrawat121.github.io/MandiSync/admin/`
+
+---
+
+## Checklist
+
+- [ ] Supabase Active + PostGIS SQL ran
+- [ ] Render web service **Free**, root `Backend`, `/health` OK
+- [ ] GitHub Actions secrets point at the Render URL
+- [ ] Pages source = GitHub Actions
+- [ ] Site loads (wait up to a minute on first try)
+
+---
+
+## Limits
+
+| Thing | What happens |
+|-------|----------------|
+| Render free | Sleeps after ~15 min idle; next visit is slow |
+| Supabase free | Pauses after ~7 days unused; click Resume |
+| Hugging Face Docker/Gradio | **Paid** — skip |
+| Live Agmarknet prices | Need `AGMARKNET_API_KEY` when data.gov.in is back |

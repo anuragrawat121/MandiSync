@@ -6,6 +6,7 @@
  */
 
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
@@ -404,12 +405,12 @@ export default function HomePage() {
                     : ""}
             </p>
           </div>
-          <a
+          <Link
             href="/admin"
             className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:border-amber-400/50 hover:text-amber-200"
           >
             Ops admin
-          </a>
+          </Link>
         </div>
       </header>
 

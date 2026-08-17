@@ -15,8 +15,11 @@ ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ARG NEXT_PUBLIC_API_KEY=
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_API_KEY=$NEXT_PUBLIC_API_KEY
+# Bust Next.js Docker cache when only env URLs change.
+ARG BUILD_STAMP=local
+ENV BUILD_STAMP=$BUILD_STAMP
 
-RUN npm run build
+RUN echo "Building UI for API $NEXT_PUBLIC_API_BASE_URL ($BUILD_STAMP)" && npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app

@@ -36,6 +36,7 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       AGMARKNET_API_KEY: ${AGMARKNET_API_KEY:-}
       ALLOW_SEED_FALLBACK: ${ALLOW_SEED_FALLBACK:-false}
+      ALLOW_CLOUDFLARE_TUNNEL_ORIGINS: ${ALLOW_CLOUDFLARE_TUNNEL_ORIGINS:-true}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -48,6 +49,8 @@ services:
       context: ./Backend
     container_name: mandisync_ingest
     command: ["python", "scripts/ingest_loop.py"]
+    healthcheck:
+      disable: true
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mandisync_db}
       SKIP_DB_INIT_ON_IMPORT: "true"
@@ -66,6 +69,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
         NEXT_PUBLIC_API_KEY: ${API_KEY}
+        BUILD_STAMP: ${BUILD_STAMP:-local}
     container_name: mandisync_web
     ports:
       - "${WEB_PORT:-3000}:3000"

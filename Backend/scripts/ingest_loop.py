@@ -24,6 +24,7 @@ def main() -> None:
     os.chdir(root)
     os.environ["PYTHONPATH"] = root
     subprocess.check_call([sys.executable, "scripts/wait_for_db.py"])
+    subprocess.call([sys.executable, "scripts/enable_postgis.py"])
     print("[ingest-loop] Running initial Agmarknet ingest…", flush=True)
     run_ingest()
 

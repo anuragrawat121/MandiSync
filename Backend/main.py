@@ -24,10 +24,11 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
-# Origins come from ALLOWED_ORIGINS (comma-separated). Default is local Next.js.
+# Exact origins from ALLOWED_ORIGINS, plus optional *.trycloudflare.com for free demos.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=parse_allowed_origins(),
+    allow_origin_regex=r"^https://[a-z0-9-]+\.(trycloudflare\.com|github\.io)$",
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*", "X-API-Key", "Content-Type"],
@@ -36,6 +37,16 @@ app.add_middleware(
 app.include_router(arbitrage_router, prefix="/api/arbitrage")
 app.include_router(leads_router, prefix="/api/leads")
 app.include_router(admin_router, prefix="/api/admin")
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {
+        "service": "MandiSync API",
+        "status": "ok",
+        "health": "/health",
+        "docs": "/docs",
+    }
 
 
 @app.get("/health")
