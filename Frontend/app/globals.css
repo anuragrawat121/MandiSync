@@ -156,6 +156,20 @@ body {
   border-bottom-color: #ff9933;
 }
 
+.gov-nav-signout {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #e8dcc6;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.4rem 0.7rem;
+}
+
+.gov-nav-signout:hover {
+  color: #fff;
+}
+
 .gov-page {
   flex: 1;
   max-width: 72rem;

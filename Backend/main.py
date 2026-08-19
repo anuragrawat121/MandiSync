@@ -12,6 +12,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 from rate_limit import limiter, rate_limit_exceeded_handler
 from routers.admin import router as admin_router
 from routers.arbitrage import router as arbitrage_router
+from routers.auth import router as auth_router
 from routers.leads import router as leads_router
 from security import parse_allowed_origins
 
@@ -31,9 +32,11 @@ app.add_middleware(
     allow_origin_regex=r"^https://[a-z0-9-]+\.github\.io$",
     allow_credentials=False,
     allow_methods=["*"],
-    allow_headers=["*", "X-API-Key", "Content-Type"],
+    allow_headers=["*", "X-API-Key", "Authorization", "Content-Type"],
 )
 
+app.include_router(auth_router, prefix="/api/auth")
+# Farmer routes require a signed-in user; /api/admin requires role=admin.
 app.include_router(arbitrage_router, prefix="/api/arbitrage")
 app.include_router(leads_router, prefix="/api/leads")
 app.include_router(admin_router, prefix="/api/admin")

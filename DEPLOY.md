@@ -67,6 +67,11 @@ postgresql://postgres:YOUR_PASSWORD@db.xxxxx.supabase.co:5432/postgres
 | `SKIP_DB_INIT_ON_IMPORT` | `true` |
 | `RUN_INGEST_LOOP` | `true` |
 | `INGEST_START_DELAY_SECONDS` | `90` |
+| `APP_USER_USERNAME` | farmer login, default `farmer` |
+| `APP_USER_PASSWORD` | farmer password (change this) |
+| `APP_ADMIN_USERNAME` | ops login, default `admin` |
+| `APP_ADMIN_PASSWORD` | ops password (change this) |
+| `JWT_SECRET` | long random string (or reuse `API_KEY`) |
 | `PYTHONPATH` | `.` |
 | `DB_WAIT_SECONDS` | `180` |
 

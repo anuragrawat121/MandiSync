@@ -54,7 +54,18 @@ export async function fetchWithTimeout(
   }
 
   try {
-    return await fetch(url, { ...rest, signal: controller.signal, cache: "no-store" });
+    const response = await fetch(url, { ...rest, signal: controller.signal, cache: "no-store" });
+    if (
+      response.status === 401 &&
+      typeof window !== "undefined" &&
+      !url.includes("/api/auth/login") &&
+      !url.includes("/api/auth/register")
+    ) {
+      const { clearSession, redirectToLogin } = await import("@/lib/auth");
+      clearSession();
+      redirectToLogin();
+    }
+    return response;
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
       if (timedOut) {

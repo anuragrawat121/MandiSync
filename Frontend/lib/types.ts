@@ -90,7 +90,7 @@ export interface LiveBriefing {
   cached?: boolean;
 }
 
-/** Shared with FastAPI X-API-Key. Visible in the browser bundle (SPA). */
+/** Shared with FastAPI only as a legacy machine key. Browser auth uses JWT. */
 export const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
 export const CROPS: CropName[] = ["Onion", "Tomato", "Potato"];
@@ -114,8 +114,18 @@ export const API_BASE_URL =
 
 export function apiHeaders(extra?: HeadersInit): Headers {
   const headers = new Headers(extra);
-  if (API_KEY) {
-    headers.set("X-API-Key", API_KEY);
+  if (typeof window !== "undefined") {
+    try {
+      const raw = window.localStorage.getItem("mandisync.session");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { token?: string };
+        if (parsed.token) {
+          headers.set("Authorization", `Bearer ${parsed.token}`);
+        }
+      }
+    } catch {
+      /* ignore broken session JSON */
+    }
   }
   return headers;
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Noto_Sans, Noto_Serif } from "next/font/google";
 import "./globals.css";
+import AuthGate from "@/components/AuthGate";
+import { AuthProvider } from "@/components/AuthProvider";
 
 const notoSans = Noto_Sans({
   subsets: ["latin", "devanagari"],
@@ -36,7 +38,9 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-[var(--paper)] font-sans text-[var(--ink)] antialiased">
-        {children}
+        <AuthProvider>
+          <AuthGate>{children}</AuthGate>
+        </AuthProvider>
       </body>
     </html>
   );

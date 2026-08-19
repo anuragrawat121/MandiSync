@@ -33,6 +33,19 @@ class Mandi(Base):
     crop_prices = relationship("CropPrice", back_populates="mandi")
 
 
+class AppUser(Base):
+    """Username/password accounts for the farmer UI and ops console."""
+
+    __tablename__ = "app_users"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String, nullable=False, unique=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False)  # "user" | "admin"
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime)
+
+
 class CropPrice(Base):
     __tablename__ = "crop_prices"
 

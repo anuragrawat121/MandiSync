@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import GovMark from "@/components/GovMark";
+import { useAuth } from "@/components/AuthProvider";
+import { loginPath } from "@/lib/auth";
 
 type Props = {
   children: React.ReactNode;
@@ -7,6 +11,13 @@ type Props = {
 };
 
 export default function SiteShell({ children, current }: Props) {
+  const { session, logout } = useAuth();
+
+  function handleSignOut() {
+    logout();
+    window.location.href = loginPath();
+  }
+
   return (
     <div className="gov-root">
       <a href="#main-content" className="gov-skip">
@@ -39,13 +50,26 @@ export default function SiteShell({ children, current }: Props) {
             >
               Corridors
             </Link>
-            <Link
-              href="/admin"
-              className={current === "admin" ? "is-active" : undefined}
-              aria-current={current === "admin" ? "page" : undefined}
-            >
-              Operations
-            </Link>
+            {session?.role === "admin" && (
+              <Link
+                href="/admin"
+                className={current === "admin" ? "is-active" : undefined}
+                aria-current={current === "admin" ? "page" : undefined}
+              >
+                Operations
+              </Link>
+            )}
+            {session && (
+              <span className="px-2 py-1 text-xs text-[#d4c7af]">
+                {session.username}
+                {session.role === "admin" ? " · admin" : ""}
+              </span>
+            )}
+            {session && (
+              <button type="button" className="gov-nav-signout" onClick={handleSignOut}>
+                Sign out
+              </button>
+            )}
           </nav>
         </div>
       </header>

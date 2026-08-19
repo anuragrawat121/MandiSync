@@ -69,6 +69,10 @@ def init_db() -> None:
     """Create tables + apply additive schema. Call after Postgres is reachable."""
     Base.metadata.create_all(bind=engine)
     ensure_crop_price_schema()
+    from services.accounts import seed_accounts
+
+    with SessionLocal() as db:
+        seed_accounts(db)
 
 
 @contextmanager

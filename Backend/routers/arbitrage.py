@@ -12,13 +12,13 @@ from sqlalchemy.orm import Session
 from database import get_db as get_db_context
 from models import CropPrice
 from rate_limit import limiter
-from security import require_api_key
+from security import require_user
 from services.arbitrage_engine import calculate_crop_arbitrage
 from services.gemini_agent import generate_live_briefing
 
 router = APIRouter(
     tags=["arbitrage"],
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_user)],
 )
 
 

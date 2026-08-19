@@ -8,12 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field, field_validator
 
 from rate_limit import limiter
-from security import require_api_key
+from security import require_user
 from services.agent_intro_store import save_agent_intro_request
 
 router = APIRouter(
     tags=["leads"],
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_user)],
 )
 
 _PHONE_DIGITS = re.compile(r"\D+")

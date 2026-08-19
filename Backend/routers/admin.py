@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from database import get_db as get_db_context
 from models import Mandi
 from rate_limit import limiter
-from security import require_api_key
+from security import require_admin
 from services.agent_intro_store import (
     VALID_STATUSES,
     list_agent_intro_requests,
@@ -23,7 +23,7 @@ from services.agent_intro_store import (
 
 router = APIRouter(
     tags=["admin"],
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_admin)],
 )
 
 _PHONE_DIGITS = re.compile(r"\D+")

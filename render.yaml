@@ -40,3 +40,13 @@ services:
         sync: false
       - key: GEMINI_API_KEY
         sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: APP_USER_USERNAME
+        sync: false
+      - key: APP_USER_PASSWORD
+        sync: false
+      - key: APP_ADMIN_USERNAME
+        sync: false
+      - key: APP_ADMIN_PASSWORD
+        sync: false
