@@ -33,7 +33,7 @@ AGMARKNET_RESOURCE_URL = (
 DISCOVER_CROPS = ("Onion", "Tomato", "Potato")
 DISCOVER_LIMIT = 100
 INGEST_LIMIT = 100
-LOOKBACK_DAYS = 3
+LOOKBACK_DAYS = 7
 REQUEST_PAUSE_SECONDS = 0.35
 FETCH_TIMEOUT_SECONDS = 90
 FETCH_RETRIES = 5
@@ -154,25 +154,28 @@ def _api_key() -> str:
 
 def fetch_agmarknet(
     *,
-    state: str,
     commodity: str,
+    state: str | None = None,
     limit: int = DISCOVER_LIMIT,
     offset: int = 0,
 ) -> dict:
     """
-    GET one page from the confirmed data.gov.in Agmarknet resource.
-    state uses filters[state.keyword]; commodity uses filters[commodity].
+    GET one page from the data.gov.in Agmarknet resource.
+
+    Use ``filters[commodity.keyword]`` (and optional ``state.keyword``).
+    Combined state+commodity filters return empty when that state did not
+    report the crop *today* — the resource is a current-day snapshot.
     """
-    query = urllib.parse.urlencode(
-        {
-            "api-key": _api_key(),
-            "format": "json",
-            "limit": str(limit),
-            "offset": str(offset),
-            "filters[state.keyword]": state,
-            "filters[commodity]": commodity,
-        }
-    )
+    params: dict[str, str] = {
+        "api-key": _api_key(),
+        "format": "json",
+        "limit": str(limit),
+        "offset": str(offset),
+        "filters[commodity.keyword]": commodity,
+    }
+    if state:
+        params["filters[state.keyword]"] = state
+    query = urllib.parse.urlencode(params)
     url = f"{AGMARKNET_RESOURCE_URL}?{query}"
     last_error: dict | None = None
     for attempt in range(1, FETCH_RETRIES + 1):
@@ -257,9 +260,16 @@ def fetch_agmarknet(
     }
 
 
-def fetch_agmarknet_all_pages(*, state: str, commodity: str, limit: int = INGEST_LIMIT) -> dict:
+def fetch_agmarknet_all_pages(
+    *,
+    commodity: str,
+    state: str | None = None,
+    limit: int = INGEST_LIMIT,
+) -> dict:
     """Paginate until offset covers API `total`. Fail the whole pull on any bad page."""
-    first = fetch_agmarknet(state=state, commodity=commodity, limit=limit, offset=0)
+    first = fetch_agmarknet(
+        commodity=commodity, state=state, limit=limit, offset=0
+    )
     if not first["ok"]:
         return first
 
@@ -273,7 +283,7 @@ def fetch_agmarknet_all_pages(*, state: str, commodity: str, limit: int = INGEST
     while offset < total:
         time.sleep(REQUEST_PAUSE_SECONDS)
         page = fetch_agmarknet(
-            state=state, commodity=commodity, limit=limit, offset=offset
+            commodity=commodity, state=state, limit=limit, offset=offset
         )
         if not page["ok"]:
             return page
@@ -375,7 +385,7 @@ def discover() -> None:
         _print(f"\n### STATE: {state}")
         for crop in DISCOVER_CROPS:
             _print(f"  [{crop}] fetching...", end="\r")
-            result = fetch_agmarknet(state=state, commodity=crop)
+            result = fetch_agmarknet(commodity=crop, state=state)
             time.sleep(REQUEST_PAUSE_SECONDS)
 
             if not result["ok"]:
@@ -424,10 +434,18 @@ def parse_arrival_date(raw: object) -> date | None:
     text = str(raw or "").strip()
     if not text:
         return None
-    try:
-        return datetime.strptime(text, "%d/%m/%Y").date()
-    except ValueError:
-        return None
+    iso = text[:10]
+    for fmt, candidate in (
+        ("%d/%m/%Y", text),
+        ("%d-%m-%Y", text),
+        ("%Y-%m-%d", iso),
+        ("%d/%m/%y", text),
+    ):
+        try:
+            return datetime.strptime(candidate, fmt).date()
+        except ValueError:
+            continue
+    return None
 
 
 def parse_modal_price(raw: object) -> Decimal | None:
@@ -526,31 +544,38 @@ def ingest() -> None:
                 f"  map {short_name!r} -> {row.name} "
                 f"(norm={normalize_market_name(row.name)!r}, id={row.id}, {row.state})"
             )
-
-        needed_queries: set[tuple[str, str]] = set()
-        for (crop, _market), short_name in MANDI_NAME_MAP.items():
-            needed_queries.add((crop, mandi_by_short[short_name].state))
     finally:
         db.close()
 
     _print("=" * 72)
     _print(" MandiSync Agmarknet INGEST (additive upsert, no truncate)")
-    _print(f" Queries: {len(needed_queries)} state×crop pages")
+    _print(f" Queries: {len(DISCOVER_CROPS)} nationwide crop pulls")
     _print("=" * 72)
 
     pulled: list[tuple[str, str, list[dict]]] = []
-    for crop, state in sorted(needed_queries, key=lambda item: (item[1], item[0])):
-        _print(f"  fetching {state} / {crop} ...")
-        result = fetch_agmarknet_all_pages(state=state, commodity=crop)
+    crop_failures = 0
+    for crop in DISCOVER_CROPS:
+        _print(f"  fetching nationwide / {crop} ...")
+        result = fetch_agmarknet_all_pages(commodity=crop)
         time.sleep(REQUEST_PAUSE_SECONDS)
         if not result["ok"]:
-            _print(f"FAILED: {state} / {crop} — {result['error']}")
-            _print("Aborting. Existing crop_prices rows were not modified.")
-            raise SystemExit(1)
+            crop_failures += 1
+            _print(f"FAILED: {crop} — {result['error']}")
+            continue
         _print(
             f"    ok  total={result['total']!r}  pulled={len(result['records'])}"
         )
-        pulled.append((crop, state, result["records"]))
+        by_state: dict[str, list[dict]] = defaultdict(list)
+        for row in result["records"]:
+            state = str(row.get("state") or "").strip()
+            if state:
+                by_state[state].append(row)
+        for state, records in sorted(by_state.items()):
+            pulled.append((crop, state, records))
+
+    if crop_failures and not pulled:
+        _print("All crop pulls failed. Existing crop_prices rows were not modified.")
+        raise SystemExit(1)
 
     # Statewide median modal per (crop, state) across this run's raw pull.
     statewide_modals: dict[tuple[str, str], list[Decimal]] = defaultdict(list)

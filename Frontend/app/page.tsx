@@ -6,7 +6,6 @@
  */
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
@@ -14,13 +13,9 @@ import {
   MapPin,
   MessageCircle,
   Phone,
-  Route,
-  Truck,
-  IndianRupee,
 } from "lucide-react";
 
 import {
-  API_BASE_URL,
   apiHeaders,
   CROPS,
   SOURCE_STATES,
@@ -33,22 +28,62 @@ import {
   type SourceState,
   type VerifiedAgent,
 } from "@/lib/types";
+import {
+  apiRoot,
+  fetchWithTimeout,
+  friendlyApiError,
+  wakeApi,
+} from "@/lib/apiClient";
 import AudioBriefing from "@/components/AudioBriefing";
 import AgentIntroForm from "@/components/AgentIntroForm";
+import SiteShell from "@/components/SiteShell";
 
-/** Leaflet touches `window` — must never SSR. */
 const ArbitrageMap = dynamic(() => import("@/components/ArbitrageMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center bg-slate-950 text-slate-400">
-      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-      Loading map…
+    <div className="flex h-full w-full items-center justify-center bg-[#e8e4dc] text-sm text-[var(--muted)]">
+      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+      Loading map
     </div>
   ),
 });
 
+function loadingHint(
+  seconds: number,
+  cropName: CropName,
+  state: SourceState,
+): { title: string; detail: string } {
+  if (seconds < 10) {
+    return {
+      title: `Fetching ${cropName} corridors for ${state}…`,
+      detail: "",
+    };
+  }
+  if (seconds < 35) {
+    return {
+      title: "Connecting to the service…",
+      detail:
+        "The free host sleeps after idle. The first open can take about a minute.",
+    };
+  }
+  if (seconds < 75) {
+    return {
+      title: "Still starting the service…",
+      detail: "Stay on this page. A cold start can take up to two minutes.",
+    };
+  }
+  return {
+    title: "This is taking longer than usual…",
+    detail: "If it does not finish soon, tap retry.",
+  };
+}
+
 function digitsOnly(phone: string): string {
   return phone.replace(/\D/g, "");
+}
+
+function rupee(value: number): string {
+  return `₹${value.toLocaleString("en-IN")}`;
 }
 
 function OfficialContactCard({ contact }: { contact: MandiContact }) {
@@ -56,22 +91,13 @@ function OfficialContactCard({ contact }: { contact: MandiContact }) {
   const waHref = `https://wa.me/${digitsOnly(contact.phone)}`;
 
   return (
-    <article className="rounded-xl border border-emerald-500/30 bg-slate-900/90 p-4 shadow-lg shadow-black/20">
-      <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-emerald-300">
-        APMC office — government published
-      </p>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display text-lg text-slate-50">{contact.name}</h3>
-          <p className="mt-1 text-sm text-slate-400">{contact.role}</p>
-          <p className="mt-2 text-sm text-slate-200">{contact.phone}</p>
-        </div>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <a
-          href={telHref}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
-        >
+    <article className="gov-card p-4">
+      <p className="gov-kicker">APMC office — government published</p>
+      <h3 className="mt-1 font-serif text-lg text-navy-dark">{contact.name}</h3>
+      <p className="mt-1 text-sm text-[var(--muted)]">{contact.role}</p>
+      <p className="gov-money mt-2 text-sm">{contact.phone}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <a href={telHref} className="gov-btn gov-btn-success">
           <Phone className="h-4 w-4" />
           Call
         </a>
@@ -79,7 +105,7 @@ function OfficialContactCard({ contact }: { contact: MandiContact }) {
           href={waHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-500"
+          className="gov-btn"
         >
           <MessageCircle className="h-4 w-4" />
           WhatsApp
@@ -100,29 +126,22 @@ function AgentContactCard({
   const waHref = `https://wa.me/${digitsOnly(agent.phone)}`;
 
   return (
-    <article className="rounded-xl border border-slate-700/80 bg-slate-900/90 p-4 shadow-lg shadow-black/20">
+    <article className="gov-card p-4">
       {demo && (
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.14em] text-amber-300">
+        <p className="gov-kicker text-[var(--saffron)]">
           Demo sample — not a real agent
         </p>
       )}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-display text-lg text-slate-50">{agent.name}</h3>
-          <p className="mt-1 text-sm text-slate-400">
-            {demo ? `Sample ID ${agent.license_id}` : `License ${agent.license_id}`}
-          </p>
-          <p className="mt-2 text-sm text-slate-200">
-            {demo ? "Phone hidden until verified" : agent.phone}
-          </p>
-        </div>
-      </div>
+      <h3 className="mt-1 font-serif text-lg text-navy-dark">{agent.name}</h3>
+      <p className="mt-1 text-sm text-[var(--muted)]">
+        {demo ? `Sample ID ${agent.license_id}` : `License ${agent.license_id}`}
+      </p>
+      <p className="mt-2 text-sm">
+        {demo ? "Phone hidden until verified" : agent.phone}
+      </p>
       {!demo && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <a
-            href={telHref}
-            className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
-          >
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a href={telHref} className="gov-btn gov-btn-success">
             <Phone className="h-4 w-4" />
             Call
           </a>
@@ -130,7 +149,7 @@ function AgentContactCard({
             href={waHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-500"
+            className="gov-btn"
           >
             <MessageCircle className="h-4 w-4" />
             WhatsApp
@@ -154,72 +173,47 @@ function RouteCard({
     <button
       type="button"
       onClick={() => onSelect(route)}
-      className={`w-full rounded-xl border p-4 text-left transition ${
+      className={`w-full border p-3 text-left transition-colors ${
         selected
-          ? "border-sky-400 bg-slate-800/90 ring-1 ring-sky-400/60"
-          : "border-slate-700/70 bg-slate-900/70 hover:border-slate-500 hover:bg-slate-800/70"
+          ? "border-navy bg-white shadow-[inset_3px_0_0_0_#c45c0a]"
+          : "border-[var(--line)] bg-[var(--panel)] hover:border-navy/40 hover:bg-white"
       }`}
     >
-      {/* State-boundary badge — instantly readable transit corridor */}
-      <div className="mb-3">
-        <span className="inline-flex max-w-full items-center rounded-full border border-sky-500/30 bg-sky-500/10 px-2.5 py-1 text-xs font-medium text-sky-300">
-          {route.source_state} to {route.destination_state}
-        </span>
+      <p className="text-xs text-[var(--muted)]">
+        {route.source_state} to {route.destination_state}
+      </p>
+      <div className="mt-1 flex items-start justify-between gap-3">
+        <p className="min-w-0 text-sm font-medium text-navy-dark">
+          {route.source_mandi}
+          <span className="mx-1.5 text-[var(--muted)]">→</span>
+          {route.destination_mandi}
+        </p>
+        <p className="gov-money shrink-0 text-harvest">
+          {rupee(route.net_profit)}
+          <span className="ml-1 text-xs font-normal text-[var(--muted)]">
+            /qtl
+          </span>
+        </p>
       </div>
-
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
-            Route
-          </p>
-          <p className="mt-1 font-medium text-slate-50">
-            {route.source_mandi}
-            <span className="mx-2 text-slate-500">→</span>
-            {route.destination_mandi}
-          </p>
+      <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-[var(--muted)]">
+        <div>
+          Distance {route.distance_km.toFixed(0)} km
         </div>
-        <div className="shrink-0 text-right">
-          <p className="text-xs uppercase tracking-[0.14em] text-slate-400">
-            Net profit
-          </p>
-          <p className="mt-1 inline-flex items-center gap-0.5 text-lg font-semibold text-emerald-400">
-            <IndianRupee className="h-4 w-4" />
-            {route.net_profit.toLocaleString("en-IN")}
-            <span className="ml-1 text-xs font-normal text-emerald-300/80">
-              /qtl
-            </span>
-          </p>
+        <div>Transit {rupee(route.transit_cost)}/qtl</div>
+        <div className="col-span-2">
+          Buy {rupee(route.source_price_per_quintal)} · Sell{" "}
+          {rupee(route.destination_price_per_quintal)}
         </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-slate-300">
-        <div className="flex items-center gap-2">
-          <Route className="h-4 w-4 text-sky-400" />
-          {route.distance_km.toFixed(0)} km
-        </div>
-        <div className="flex items-center gap-2">
-          <Truck className="h-4 w-4 text-amber-300" />
-          Transit ₹{route.transit_cost.toLocaleString("en-IN")}/qtl
-        </div>
-        <div className="col-span-2 flex flex-col gap-1 text-slate-400">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 shrink-0" />
-            <span>
-              Buy ₹{route.source_price_per_quintal.toLocaleString("en-IN")} · Sell ₹
-              {route.destination_price_per_quintal.toLocaleString("en-IN")}
-            </span>
+        {(route.source_price_date || route.destination_price_date) && (
+          <div className="col-span-2">
+            Prices as of {route.source_price_date ?? "—"}
+            {route.destination_price_date &&
+            route.destination_price_date !== route.source_price_date
+              ? ` → ${route.destination_price_date}`
+              : ""}
           </div>
-          {(route.source_price_date || route.destination_price_date) && (
-            <p className="pl-6 text-xs text-slate-500">
-              Prices as of {route.source_price_date ?? "—"}
-              {route.destination_price_date &&
-              route.destination_price_date !== route.source_price_date
-                ? ` → ${route.destination_price_date}`
-                : ""}
-            </p>
-          )}
-        </div>
-      </div>
+        )}
+      </dl>
     </button>
   );
 }
@@ -238,21 +232,23 @@ export default function HomePage() {
     null,
   );
   const [loading, setLoading] = useState(false);
+  const [waitSeconds, setWaitSeconds] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [liveBriefing, setLiveBriefing] = useState<LiveBriefing | null>(null);
   const [briefingLoading, setBriefingLoading] = useState(false);
   const [enamHelpline, setEnamHelpline] = useState("18002700224");
 
-  const fetchRoutes = useCallback(async (cropName: CropName) => {
+  const fetchRoutes = useCallback(async (cropName: CropName, signal: AbortSignal) => {
     setLoading(true);
     setError(null);
     setSelectedRoute(null);
     setLiveBriefing(null);
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/arbitrage/?crop_name=${encodeURIComponent(cropName)}`,
-        { headers: apiHeaders() },
+      await wakeApi(signal);
+      const response = await fetchWithTimeout(
+        `${apiRoot()}/api/arbitrage/?crop_name=${encodeURIComponent(cropName)}`,
+        { headers: apiHeaders(), timeoutMs: 45_000, signal },
       );
 
       if (!response.ok) {
@@ -272,32 +268,44 @@ export default function HomePage() {
         setEnamHelpline(data.enam_helpline);
       }
     } catch (err) {
+      if (signal.aborted || (err instanceof DOMException && err.name === "AbortError")) {
+        return;
+      }
       setRoutes([]);
       setAgentsStatus("unavailable");
       setDataSourceUsed(null);
       setApiStatus(null);
       setApiMessage(null);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load arbitrage routes.",
-      );
+      setError(friendlyApiError(err));
     } finally {
-      setLoading(false);
+      if (!signal.aborted) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    void fetchRoutes(crop);
+    const controller = new AbortController();
+    void fetchRoutes(crop, controller.signal);
+    return () => controller.abort();
   }, [crop, fetchRoutes]);
 
-  // Clear map selection when the farmer changes their home state.
+  useEffect(() => {
+    if (!loading) {
+      setWaitSeconds(0);
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setWaitSeconds((seconds) => seconds + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [loading]);
+
   useEffect(() => {
     setSelectedRoute(null);
     setLiveBriefing(null);
   }, [selectedState]);
 
-  // Live Gemini briefing for the selected corridor.
   useEffect(() => {
     if (!selectedRoute) {
       setLiveBriefing(null);
@@ -309,25 +317,28 @@ export default function HomePage() {
 
     void (async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/arbitrage/briefing`, {
-          method: "POST",
-          headers: apiHeaders({ "Content-Type": "application/json" }),
-          body: JSON.stringify({
-            ...selectedRoute,
-            agents_status:
-              selectedRoute.agents_status ?? agentsStatus ?? "unavailable",
-            // Never send seeded phones into the LLM prompt path as actionable.
-            destination_verified_agents:
-              (selectedRoute.agents_status ?? agentsStatus) === "verified"
-                ? selectedRoute.destination_verified_agents
-                : [],
-            destination_contacts:
-              (selectedRoute.agents_status ?? agentsStatus) === "official"
-                ? selectedRoute.destination_contacts ?? []
-                : [],
-          }),
-          signal: controller.signal,
-        });
+        const response = await fetchWithTimeout(
+          `${apiRoot()}/api/arbitrage/briefing`,
+          {
+            method: "POST",
+            headers: apiHeaders({ "Content-Type": "application/json" }),
+            timeoutMs: 45_000,
+            signal: controller.signal,
+            body: JSON.stringify({
+              ...selectedRoute,
+              agents_status:
+                selectedRoute.agents_status ?? agentsStatus ?? "unavailable",
+              destination_verified_agents:
+                (selectedRoute.agents_status ?? agentsStatus) === "verified"
+                  ? selectedRoute.destination_verified_agents
+                  : [],
+              destination_contacts:
+                (selectedRoute.agents_status ?? agentsStatus) === "official"
+                  ? selectedRoute.destination_contacts ?? []
+                  : [],
+            }),
+          },
+        );
         if (!response.ok) {
           throw new Error(`Briefing API ${response.status}`);
         }
@@ -346,7 +357,6 @@ export default function HomePage() {
     return () => controller.abort();
   }, [selectedRoute, agentsStatus]);
 
-  // On phones, jump to map/details after a route is tapped.
   useEffect(() => {
     if (!selectedRoute || typeof window === "undefined") return;
     if (window.matchMedia("(min-width: 1024px)").matches) return;
@@ -356,10 +366,6 @@ export default function HomePage() {
     });
   }, [selectedRoute]);
 
-  /**
-   * Farmer-First filter: keep API profit sort, then show only routes
-   * originating from the selected source state.
-   */
   const filteredRoutes = useMemo(() => {
     return routes.filter((route) => route.source_state === selectedState);
   }, [routes, selectedState]);
@@ -380,458 +386,429 @@ export default function HomePage() {
     officialContacts.length > 0;
   const showVerifiedAgents =
     routeAgentsStatus === "verified" && agents.length > 0;
+  const waitHint = loadingHint(waitSeconds, crop, selectedState);
+
+  const sourceNote =
+    dataSourceUsed === "agmarknet"
+      ? "Prices are from live Agmarknet."
+      : dataSourceUsed === "seed"
+        ? "Demo seed prices are in use."
+        : apiStatus === "no_fresh_prices"
+          ? "No fresh Agmarknet prices right now."
+          : "";
 
   return (
-    <main className="min-h-screen bg-slate-900 text-slate-100">
-      <header className="border-b border-slate-800 px-4 py-4 sm:px-6 md:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-sky-400">
-              MandiSync
-            </p>
-            <h1 className="font-display mt-1 text-xl text-slate-50 sm:text-2xl">
-              Crop Arbitrage
-            </h1>
-            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
-              Pick your home state and crop to see corridors that start where you
-              farm. Net profit is an estimate after transit, ~7% mandi fees, and
-              spoilage risk — not a guaranteed payout.
-              {dataSourceUsed === "agmarknet"
-                ? " Prices are from live Agmarknet (gov API)."
-                : dataSourceUsed === "seed"
-                  ? " Demo seed prices (ALLOW_SEED_FALLBACK is on)."
-                  : apiStatus === "no_fresh_prices"
-                    ? " No fresh Agmarknet prices right now."
-                    : ""}
-            </p>
-          </div>
-          <Link
-            href="/admin"
-            className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 transition hover:border-amber-400/50 hover:text-amber-200"
-          >
-            Ops admin
-          </Link>
-        </div>
-      </header>
+    <SiteShell current="home">
+      <main id="main-content" className="gov-page">
+        <p className="gov-kicker">For Farmer Producer Organisations</p>
+        <h1 className="gov-title">Crop arbitrage corridors</h1>
+        <p className="gov-lede">
+          Choose your home state and crop. Only routes with estimated net profit
+          after transit, about 7% mandi fees, and spoilage are listed.{" "}
+          {sourceNote}
+        </p>
 
-      {/* Phone-first: one scrolling column. Desktop: filters+routes | map+details */}
-      <div className="mx-auto grid max-w-7xl gap-0 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <aside className="border-b border-slate-800 lg:border-b-0 lg:border-r">
-          <div className="sticky top-0 z-20 space-y-4 border-b border-slate-800 bg-slate-900/95 p-4 backdrop-blur sm:p-5">
-            <div className="space-y-2">
-              <label
-                htmlFor="state-select"
-                className="block text-xs uppercase tracking-[0.16em] text-slate-400"
-              >
-                Your location (source state)
-              </label>
-              <select
-                id="state-select"
-                value={selectedState}
-                onChange={(event) =>
-                  setSelectedState(event.target.value as SourceState)
-                }
-                className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-base text-slate-100 outline-none ring-sky-400/40 focus:ring-2 sm:py-2.5 sm:text-sm"
-              >
-                {SOURCE_STATES.map((state) => (
-                  <option key={state} value={state}>
-                    {state}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label
-                htmlFor="crop-select"
-                className="block text-xs uppercase tracking-[0.16em] text-slate-400"
-              >
-                Crop
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {CROPS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setCrop(option)}
-                    className={`rounded-xl border px-2 py-3 text-sm font-medium transition ${
-                      crop === option
-                        ? "border-sky-400 bg-sky-500/15 text-sky-200"
-                        : "border-slate-700 bg-slate-950 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-              <select
-                id="crop-select"
-                value={crop}
-                onChange={(event) => setCrop(event.target.value as CropName)}
-                className="sr-only"
-                aria-hidden
-                tabIndex={-1}
-              >
-                {CROPS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {!loading && !error && (
-              <p className="text-xs text-slate-500">
-                {filteredRoutes.length} of {routes.length} profitable{" "}
-                {crop.toLowerCase()} corridors from {selectedState}.
-              </p>
-            )}
-          </div>
-
-          <div className="space-y-3 p-4 sm:p-5">
-            {loading && (
-              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-6 text-slate-400">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Fetching {crop} routes for {selectedState}…
-              </div>
-            )}
-
-            {!loading && error && (
-              <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-4 py-4 text-sm text-rose-200">
-                {error}
-              </div>
-            )}
-
-            {!loading && !error && apiStatus === "no_fresh_prices" && (
-              <div className="rounded-xl border border-amber-500/40 bg-amber-950/40 px-4 py-6 text-sm leading-relaxed text-amber-50">
-                <p className="font-medium text-amber-100">No fresh market prices</p>
-                <p className="mt-2 text-amber-100/90">
-                  {apiMessage ??
-                    `Agmarknet has no usable ${crop} quotes within the last few days. We do not show fake seed prices in live mode.`}
-                </p>
-                <p className="mt-3 text-xs text-amber-200/80">
-                  Fix: run{" "}
-                  <code className="rounded bg-black/30 px-1 py-0.5">
-                    python ingest_prices.py --ingest
-                  </code>{" "}
-                  (or wait for the daily scheduled pull).
-                </p>
-              </div>
-            )}
-
-            {!loading &&
-              !error &&
-              apiStatus !== "no_fresh_prices" &&
-              filteredRoutes.length === 0 && (
-              <div className="rounded-xl border border-amber-500/25 bg-amber-950/25 px-4 py-6 text-sm leading-relaxed text-amber-100/90">
-                No profitable routes found from this state today. Try another
-                crop or check nearby regions.
-              </div>
-            )}
-
-            {!loading &&
-              apiStatus !== "no_fresh_prices" &&
-              filteredRoutes.map((route) => {
-                const key = `${route.source_mandi}-${route.destination_mandi}-${route.net_profit}`;
-                return (
-                  <RouteCard
-                    key={key}
-                    route={route}
-                    selected={
-                      selectedRoute?.source_mandi === route.source_mandi &&
-                      selectedRoute?.destination_mandi ===
-                        route.destination_mandi
-                    }
-                    onSelect={setSelectedRoute}
-                  />
-                );
-              })}
-          </div>
-        </aside>
-
-        <section className="bg-slate-950/40">
-          <div className="relative h-[42vh] min-h-[220px] overflow-hidden border-b border-slate-800 bg-slate-950 sm:h-[48vh] lg:sticky lg:top-0 lg:h-[45vh]">
-            <div className="absolute inset-0">
-              <ArbitrageMap selectedRoute={selectedRoute} />
-            </div>
-            {!selectedRoute && (
-              <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[500] rounded-xl border border-slate-700/80 bg-slate-950/85 px-3 py-2 text-center text-sm text-slate-300 backdrop-blur sm:inset-x-auto sm:left-1/2 sm:max-w-md sm:-translate-x-1/2 sm:rounded-full sm:px-4">
-                Tap a route to plot the haul on the map.
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-4 p-4 sm:p-5" id="route-details">
-            {selectedRoute && (
-              <AudioBriefing
-                routeData={selectedRoute}
-                isActive
-                liveBriefing={liveBriefing}
-              />
-            )}
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-violet-500/30 bg-violet-950/20 p-4">
-                <p className="text-xs uppercase tracking-[0.16em] text-violet-300">
-                  Corridor summary
-                </p>
-                <h2 className="font-display mt-1 text-lg text-slate-50">
-                  {selectedRoute
-                    ? `${selectedRoute.source_mandi} → ${selectedRoute.destination_mandi}`
-                    : "Select a route"}
-                </h2>
-
-                {!selectedRoute ? (
-                  <p className="mt-3 text-sm leading-relaxed text-slate-400">
-                    Choose a corridor from the list to see haul distance,
-                    transit cost, and estimated net profit.
-                  </p>
-                ) : (
-                  <div className="mt-3 space-y-3 text-sm text-slate-300">
-                    <p className="text-[11px] uppercase tracking-[0.14em] text-violet-300/80">
-                      {briefingLoading
-                        ? "Gemini drafting live briefing…"
-                        : liveBriefing?.source === "gemini"
-                          ? "Live Gemini briefing"
-                          : "Simulation briefing"}
-                    </p>
-                    <p className="leading-relaxed text-slate-200">
-                      {briefingLoading && !liveBriefing
-                        ? "Generating route strategy from live market + monsoon context…"
-                        : liveBriefing?.on_screen_caption ??
-                          `Moving ${selectedRoute.crop_name.toLowerCase()} from ${selectedRoute.source_mandi} to ${selectedRoute.destination_mandi}.`}
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-slate-700/70 bg-slate-900/70 p-3">
-                        <p className="text-xs text-slate-500">Gross spread</p>
-                        <p className="mt-1 font-medium text-slate-100">
-                          ₹{selectedRoute.gross_spread.toLocaleString("en-IN")}
-                          /qtl
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-slate-700/70 bg-slate-900/70 p-3">
-                        <p className="text-xs text-slate-500">Transit</p>
-                        <p className="mt-1 font-medium text-amber-200">
-                          ₹{selectedRoute.transit_cost.toLocaleString("en-IN")}
-                          /qtl
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-slate-700/70 bg-slate-900/70 p-3">
-                        <p className="text-xs text-slate-500">
-                          Mandi fees (~7%)
-                        </p>
-                        <p className="mt-1 font-medium text-amber-200">
-                          ₹
-                          {(
-                            selectedRoute.mandi_fee_per_quintal ?? 0
-                          ).toLocaleString("en-IN")}
-                          /qtl
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-slate-700/70 bg-slate-900/70 p-3">
-                        <p className="text-xs text-slate-500">Spoilage risk</p>
-                        <p className="mt-1 font-medium text-amber-200">
-                          ₹
-                          {(
-                            selectedRoute.perishability_cost_per_quintal ?? 0
-                          ).toLocaleString("en-IN")}
-                          /qtl
-                        </p>
-                      </div>
-                      <div className="col-span-2 rounded-lg border border-emerald-500/30 bg-emerald-950/30 p-3">
-                        <p className="text-xs text-emerald-300/80">
-                          Estimated net after fees & spoilage
-                        </p>
-                        <p className="mt-1 text-lg font-semibold text-emerald-400">
-                          ₹{selectedRoute.net_profit.toLocaleString("en-IN")}/qtl
-                        </p>
-                        <p className="mt-2 text-[11px] leading-relaxed text-emerald-200/70">
-                          Estimate only — great-circle distance, assumes a full
-                          truck, and does not include backhaul or load-fill time.
-                          {(selectedRoute.source_price_date ||
-                            selectedRoute.destination_price_date) && (
-                            <>
-                              {" "}
-                              Prices dated{" "}
-                              {selectedRoute.source_price_date ?? "—"}
-                              {selectedRoute.destination_price_date &&
-                              selectedRoute.destination_price_date !==
-                                selectedRoute.source_price_date
-                                ? ` / ${selectedRoute.destination_price_date}`
-                                : ""}
-                              .
-                            </>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+        <div className="mt-6 grid gap-0 border border-[var(--line)] bg-[var(--panel)] lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+          <aside className="border-b border-[var(--line)] lg:border-b-0 lg:border-r">
+            <div className="sticky top-0 z-20 space-y-4 border-b border-[var(--line)] bg-[var(--panel)] p-4">
+              <div>
+                <label htmlFor="state-select" className="gov-label">
+                  Source state
+                </label>
+                <select
+                  id="state-select"
+                  value={selectedState}
+                  onChange={(event) =>
+                    setSelectedState(event.target.value as SourceState)
+                  }
+                  className="gov-select"
+                >
+                  {SOURCE_STATES.map((state) => (
+                    <option key={state} value={state}>
+                      {state}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
-                <div className="mb-3">
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                    Destination contacts
+                <p className="gov-label" id="crop-label">
+                  Crop
+                </p>
+                <div
+                  className="grid grid-cols-3 border border-[#b7b0a4]"
+                  role="group"
+                  aria-labelledby="crop-label"
+                >
+                  {CROPS.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setCrop(option)}
+                      className={`border-r border-[#b7b0a4] px-2 py-2 text-sm last:border-r-0 ${
+                        crop === option
+                          ? "bg-navy text-white"
+                          : "bg-white text-navy hover:bg-[#eef3f8]"
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  id="crop-select"
+                  value={crop}
+                  onChange={(event) => setCrop(event.target.value as CropName)}
+                  className="sr-only"
+                  aria-hidden
+                  tabIndex={-1}
+                >
+                  {CROPS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {!loading && !error && (
+                <p className="gov-meta">
+                  {filteredRoutes.length} of {routes.length} profitable{" "}
+                  {crop.toLowerCase()} corridors from {selectedState}.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2 p-4">
+              {loading && (
+                <div className="gov-notice">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                    <p>{waitHint.title}</p>
+                  </div>
+                  {waitHint.detail ? (
+                    <p className="gov-meta mt-2">
+                      {waitHint.detail} {waitSeconds > 0 ? `${waitSeconds}s` : ""}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+
+              {!loading && error && (
+                <div className="gov-notice gov-notice-error">
+                  <p>{error}</p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void fetchRoutes(crop, new AbortController().signal)
+                    }
+                    className="gov-btn mt-3"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {!loading && !error && apiStatus === "no_fresh_prices" && (
+                <div className="gov-notice gov-notice-warn">
+                  <p className="font-semibold">No fresh market prices</p>
+                  <p className="mt-2">
+                    {apiMessage ??
+                      `Agmarknet has no usable ${crop} quotes within the last few days. Seed prices are not shown in live mode.`}
                   </p>
-                  <h2 className="font-display text-lg text-slate-50">
+                </div>
+              )}
+
+              {!loading &&
+                !error &&
+                apiStatus !== "no_fresh_prices" &&
+                filteredRoutes.length === 0 && (
+                  <div className="gov-notice gov-notice-warn">
+                    No profitable routes found from this state today. Try another
+                    crop or a nearby state.
+                  </div>
+                )}
+
+              {!loading &&
+                apiStatus !== "no_fresh_prices" &&
+                filteredRoutes.map((route) => {
+                  const key = `${route.source_mandi}-${route.destination_mandi}-${route.net_profit}`;
+                  return (
+                    <RouteCard
+                      key={key}
+                      route={route}
+                      selected={
+                        selectedRoute?.source_mandi === route.source_mandi &&
+                        selectedRoute?.destination_mandi ===
+                          route.destination_mandi
+                      }
+                      onSelect={setSelectedRoute}
+                    />
+                  );
+                })}
+            </div>
+          </aside>
+
+          <section>
+            <div className="relative h-[42vh] min-h-[220px] overflow-hidden border-b border-[var(--line)] bg-[#e8e4dc] sm:h-[48vh] lg:sticky lg:top-0 lg:h-[45vh]">
+              <div className="absolute inset-0">
+                <ArbitrageMap selectedRoute={selectedRoute} />
+              </div>
+              {!selectedRoute && (
+                <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[500] border border-[var(--line)] bg-[var(--panel)] px-3 py-2 text-center text-sm text-[var(--muted)] sm:inset-x-auto sm:left-1/2 sm:max-w-md sm:-translate-x-1/2">
+                  Select a corridor to plot the haul.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-5" id="route-details">
+              {selectedRoute && (
+                <AudioBriefing
+                  routeData={selectedRoute}
+                  isActive
+                  liveBriefing={liveBriefing}
+                />
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="gov-card p-4">
+                  <p className="gov-kicker">Corridor summary</p>
+                  <h2 className="mt-1 font-serif text-lg text-navy-dark">
+                    {selectedRoute
+                      ? `${selectedRoute.source_mandi} → ${selectedRoute.destination_mandi}`
+                      : "Select a route"}
+                  </h2>
+
+                  {!selectedRoute ? (
+                    <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
+                      Choose a corridor from the list to see haul distance,
+                      transit cost, and estimated net profit.
+                    </p>
+                  ) : (
+                    <div className="mt-3 space-y-3 text-sm">
+                      <p className="gov-meta">
+                        {briefingLoading
+                          ? "Preparing briefing…"
+                          : liveBriefing?.source === "gemini"
+                            ? "Live briefing"
+                            : "Template briefing"}
+                      </p>
+                      <p className="leading-relaxed">
+                        {briefingLoading && !liveBriefing
+                          ? "Generating route notes from market context…"
+                          : liveBriefing?.on_screen_caption ??
+                            `Moving ${selectedRoute.crop_name.toLowerCase()} from ${selectedRoute.source_mandi} to ${selectedRoute.destination_mandi}.`}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="border border-[var(--line)] bg-white p-3">
+                          <p className="gov-meta">Gross spread</p>
+                          <p className="gov-money mt-1">
+                            {rupee(selectedRoute.gross_spread)}/qtl
+                          </p>
+                        </div>
+                        <div className="border border-[var(--line)] bg-white p-3">
+                          <p className="gov-meta">Transit</p>
+                          <p className="gov-money mt-1">
+                            {rupee(selectedRoute.transit_cost)}/qtl
+                          </p>
+                        </div>
+                        <div className="border border-[var(--line)] bg-white p-3">
+                          <p className="gov-meta">Mandi fees (~7%)</p>
+                          <p className="gov-money mt-1">
+                            {rupee(selectedRoute.mandi_fee_per_quintal ?? 0)}/qtl
+                          </p>
+                        </div>
+                        <div className="border border-[var(--line)] bg-white p-3">
+                          <p className="gov-meta">Spoilage risk</p>
+                          <p className="gov-money mt-1">
+                            {rupee(
+                              selectedRoute.perishability_cost_per_quintal ?? 0,
+                            )}
+                            /qtl
+                          </p>
+                        </div>
+                        <div className="col-span-2 border border-[#b5d4c0] bg-[var(--ok-bg)] p-3">
+                          <p className="gov-meta text-[#14532d]">
+                            Estimated net after fees &amp; spoilage
+                          </p>
+                          <p className="gov-money mt-1 text-lg text-harvest">
+                            {rupee(selectedRoute.net_profit)}/qtl
+                          </p>
+                          <p className="mt-2 text-xs leading-relaxed text-[#14532d]/80">
+                            Estimate only — great-circle distance, assumes a full
+                            truck, and does not include backhaul or waiting time.
+                            {(selectedRoute.source_price_date ||
+                              selectedRoute.destination_price_date) && (
+                              <>
+                                {" "}
+                                Prices dated{" "}
+                                {selectedRoute.source_price_date ?? "—"}
+                                {selectedRoute.destination_price_date &&
+                                selectedRoute.destination_price_date !==
+                                  selectedRoute.source_price_date
+                                  ? ` / ${selectedRoute.destination_price_date}`
+                                  : ""}
+                                .
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="gov-kicker">Destination contacts</p>
+                  <h2 className="mt-1 font-serif text-lg text-navy-dark">
                     {selectedRoute
                       ? selectedRoute.destination_mandi
                       : "Awaiting route selection"}
                   </h2>
                   {selectedRoute && (
-                    <p className="mt-1 text-sm text-slate-400">
+                    <p className="mt-1 text-sm text-[var(--muted)]">
                       {selectedRoute.source_state} to{" "}
                       {selectedRoute.destination_state}
                     </p>
                   )}
+
+                  {!selectedRoute && (
+                    <p className="gov-notice mt-3 border-dashed">
+                      Select a profitable route to see arrival guidance for the
+                      destination market.
+                    </p>
+                  )}
+
+                  {selectedRoute && (
+                    <div className="gov-card mt-3 p-4">
+                      <p className="gov-kicker">Find traders on e-NAM</p>
+                      <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+                        Search for{" "}
+                        <span className="font-medium text-ink">
+                          {selectedRoute.destination_enam_apmc_search ??
+                            selectedRoute.destination_mandi}
+                        </span>{" "}
+                        on the official e-NAM mandi directory, or call the
+                        national helpdesk.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <a
+                          href={
+                            selectedRoute.destination_enam_url ??
+                            "https://enam.gov.in/web/apmc-contact-details"
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="gov-btn gov-btn-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          e-NAM mandi list
+                        </a>
+                        <a href={`tel:${enamHelpline}`} className="gov-btn">
+                          <Phone className="h-4 w-4" />
+                          Helpline {enamHelpline}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedRoute && routeAgentsStatus === "unavailable" && (
+                    <p className="gov-notice gov-notice-warn mt-3">
+                      No official APMC phone number is loaded for this
+                      destination yet. On arrival, ask at the market committee
+                      office before unloading.
+                    </p>
+                  )}
+
+                  {selectedRoute && showVerifiedAgents && (
+                    <>
+                      <p className="gov-notice gov-notice-ok mt-3">
+                        Verified commission agents for this yard — curated after
+                        offline license checks. Still confirm unloading terms at
+                        the APMC office on arrival.
+                      </p>
+                      <div className="mt-3 grid gap-3">
+                        {agents.map((agent) => (
+                          <AgentContactCard
+                            key={`${agent.license_id}-${agent.phone}`}
+                            agent={agent}
+                            demo={false}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {selectedRoute && showOfficialContacts && (
+                    <>
+                      <p className="gov-notice gov-notice-ok mt-3">
+                        These numbers are from official APMC or state marketing
+                        board directories — market office staff, not individual
+                        commission agents.
+                        {selectedRoute.destination_contact_source && (
+                          <> Source: {selectedRoute.destination_contact_source}.</>
+                        )}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {selectedRoute.destination_maps_url && (
+                          <a
+                            href={selectedRoute.destination_maps_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="gov-btn"
+                          >
+                            <MapPin className="h-4 w-4" />
+                            Open in Maps
+                          </a>
+                        )}
+                        {selectedRoute.destination_profile_url && (
+                          <a
+                            href={selectedRoute.destination_profile_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="gov-btn"
+                          >
+                            Official mandi page
+                          </a>
+                        )}
+                      </div>
+                      <div className="mt-3 grid gap-3">
+                        {officialContacts.map((contact) => (
+                          <OfficialContactCard
+                            key={`${contact.name}-${contact.phone}`}
+                            contact={contact}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {selectedRoute && <AgentIntroForm route={selectedRoute} />}
+
+                  {selectedRoute && showDemoAgents && (
+                    <>
+                      <p className="gov-notice gov-notice-warn mt-3">
+                        Sample layout only — these names and numbers are demo
+                        placeholders, not real agents. Call and WhatsApp are
+                        disabled.
+                      </p>
+                      <div className="mt-3 grid gap-3">
+                        {agents.map((agent) => (
+                          <AgentContactCard
+                            key={`${agent.license_id}-${agent.phone}`}
+                            agent={agent}
+                            demo
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {!selectedRoute && (
-                  <p className="rounded-xl border border-dashed border-slate-700 px-4 py-6 text-sm text-slate-400">
-                    Select a profitable route to see arrival guidance for the
-                    destination market.
-                  </p>
-                )}
-
-                {selectedRoute && (
-                  <div className="mb-4 rounded-xl border border-sky-500/25 bg-sky-950/20 px-4 py-3">
-                    <p className="text-xs uppercase tracking-[0.14em] text-sky-300">
-                      Find traders on e-NAM
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-slate-300">
-                      Search for{" "}
-                      <span className="font-medium text-slate-100">
-                        {selectedRoute.destination_enam_apmc_search ??
-                          selectedRoute.destination_mandi}
-                      </span>{" "}
-                      on the official e-NAM mandi directory, or call the national
-                      helpdesk.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <a
-                        href={
-                          selectedRoute.destination_enam_url ??
-                          "https://enam.gov.in/web/apmc-contact-details"
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-sky-600"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                        e-NAM mandi list
-                      </a>
-                      <a
-                        href={`tel:${enamHelpline}`}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-400"
-                      >
-                        <Phone className="h-4 w-4" />
-                        e-NAM helpline {enamHelpline}
-                      </a>
-                    </div>
-                  </div>
-                )}
-
-                {selectedRoute && routeAgentsStatus === "unavailable" && (
-                  <p className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-4 text-sm leading-relaxed text-amber-100">
-                    No official APMC phone number is loaded for this destination
-                    yet. On arrival, ask at the market committee office before
-                    unloading — do not rely on unverified contacts from any app.
-                  </p>
-                )}
-
-                {selectedRoute && showVerifiedAgents && (
-                  <>
-                    <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 py-3 text-sm leading-relaxed text-emerald-100">
-                      Verified commission agents for this yard — curated by
-                      MandiSync after offline license checks. Still confirm
-                      unloading terms at the APMC office on arrival.
-                    </p>
-                    <div className="mb-4 grid gap-3">
-                      {agents.map((agent) => (
-                        <AgentContactCard
-                          key={`${agent.license_id}-${agent.phone}`}
-                          agent={agent}
-                          demo={false}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {selectedRoute && showOfficialContacts && (
-                  <>
-                    <p className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-4 py-3 text-sm leading-relaxed text-emerald-100">
-                      These numbers are from official APMC or state marketing
-                      board directories — market office staff, not individual
-                      commission agents. Confirm your unloading agent at the
-                      yard office on arrival.
-                      {selectedRoute.destination_contact_source && (
-                        <>
-                          {" "}
-                          Source: {selectedRoute.destination_contact_source}.
-                        </>
-                      )}
-                    </p>
-                    <div className="mb-3 flex flex-wrap gap-2">
-                      {selectedRoute.destination_maps_url && (
-                        <a
-                          href={selectedRoute.destination_maps_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-400 hover:text-sky-200"
-                        >
-                          <MapPin className="h-4 w-4" />
-                          Open in Maps
-                        </a>
-                      )}
-                      {selectedRoute.destination_profile_url && (
-                        <a
-                          href={selectedRoute.destination_profile_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm text-slate-200 transition hover:border-sky-400 hover:text-sky-200"
-                        >
-                          Official mandi page
-                        </a>
-                      )}
-                    </div>
-                    <div className="grid gap-3">
-                      {officialContacts.map((contact) => (
-                        <OfficialContactCard
-                          key={`${contact.name}-${contact.phone}`}
-                          contact={contact}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {selectedRoute && <AgentIntroForm route={selectedRoute} />}
-
-                {selectedRoute && showDemoAgents && (
-                  <>
-                    <p className="mb-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm leading-relaxed text-amber-100">
-                      Sample layout only — these names and numbers are demo
-                      placeholders from seed data, not real agents. Call and
-                      WhatsApp are disabled.
-                    </p>
-                    <div className="grid gap-3">
-                      {agents.map((agent) => (
-                        <AgentContactCard
-                          key={`${agent.license_id}-${agent.phone}`}
-                          agent={agent}
-                          demo
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
               </div>
             </div>
-          </div>
-        </section>
-      </div>
-    </main>
+          </section>
+        </div>
+      </main>
+    </SiteShell>
   );
 }

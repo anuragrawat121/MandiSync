@@ -214,28 +214,24 @@ export default function AudioBriefing({
     liveBriefing?.on_screen_caption || getRegionalSpeechText(routeData);
 
   return (
-    <div className="rounded-xl border border-purple-500/30 bg-slate-900/80 p-4 shadow-lg shadow-purple-500/5">
-      <p className="text-xs uppercase tracking-[0.16em] text-purple-300">
-        Audio Companion
-      </p>
-      <p className="mt-1 text-sm text-slate-400">
-        Hindi (Devanagari) briefing with an Indian TTS voice — not a US/UK accent.
+    <div className="gov-card p-4">
+      <p className="gov-kicker">Audio briefing</p>
+      <p className="mt-1 text-sm text-[var(--muted)]">
+        Hindi (Devanagari) readout with an Indian voice. Install Google Hindi
+        in Chrome if the list is empty.
       </p>
 
-      <label
-        htmlFor="indian-voice-select"
-        className="mt-3 block text-xs uppercase tracking-[0.14em] text-slate-500"
-      >
-        Indian voice
+      <label htmlFor="indian-voice-select" className="gov-label mt-3">
+        Voice
       </label>
       <select
         id="indian-voice-select"
         value={selectedVoiceURI}
         onChange={(event) => setSelectedVoiceURI(event.target.value)}
-        className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none ring-purple-400/40 focus:ring-2"
+        className="gov-select"
       >
         {indianRanked.length === 0 && (
-          <option value="">Google Hindi voice not found — install in Chrome</option>
+          <option value="">Google Hindi voice not found</option>
         )}
         {indianRanked.map((entry) => (
           <option key={entry.voice.voiceURI} value={entry.voice.voiceURI}>
@@ -245,38 +241,35 @@ export default function AudioBriefing({
       </select>
 
       {!hasIndianVoice && (
-        <div className="mt-3 flex gap-2 rounded-lg border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs leading-relaxed text-amber-100">
+        <div className="gov-notice gov-notice-warn mt-3 flex gap-2 text-xs">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Google हिंदी voice not detected. Open Chrome → Settings → Languages
-            → add Hindi, then check accessibility / speech voices, and refresh
-            this page.
+            Google हिंदी voice not detected. In Chrome: Settings → Languages →
+            add Hindi, then refresh this page.
           </p>
         </div>
       )}
 
       {selectedVoice && (
-        <p className="mt-2 text-xs text-slate-500">
-          Active voice: {selectedVoice.name} · {selectedVoice.lang}
+        <p className="gov-meta mt-2">
+          Active: {selectedVoice.name} · {selectedVoice.lang}
         </p>
       )}
 
       <button
         type="button"
         onClick={handlePlayback}
-        className="mt-4 flex w-full items-center justify-center gap-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-3 font-semibold text-white shadow-lg shadow-purple-500/10 transition-all hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98]"
+        className="gov-btn gov-btn-primary mt-4 w-full"
       >
         {isSpeaking ? (
-          <Square className="h-5 w-5 fill-current" aria-hidden />
+          <Square className="h-4 w-4 fill-current" aria-hidden />
         ) : (
-          <Volume2 className="h-5 w-5" aria-hidden />
+          <Volume2 className="h-4 w-4" aria-hidden />
         )}
-        <span className={isSpeaking ? "animate-pulse" : undefined}>
-          {isSpeaking ? "Stop Briefing" : "Listen to Route Briefing"}
-        </span>
+        {isSpeaking ? "Stop briefing" : "Listen to briefing"}
       </button>
 
-      <p className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 p-3 text-xs leading-relaxed text-slate-400">
+      <p className="mt-3 border border-[var(--line)] bg-white p-3 text-xs leading-relaxed text-[var(--muted)]">
         {caption}
       </p>
     </div>

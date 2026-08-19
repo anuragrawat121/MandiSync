@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
-import { Fraunces, Sora } from "next/font/google";
+import { Noto_Sans, Noto_Serif } from "next/font/google";
 import "./globals.css";
 
-const sora = Sora({
-  subsets: ["latin"],
-  variable: "--font-sora",
+const notoSans = Noto_Sans({
+  subsets: ["latin", "devanagari"],
+  variable: "--font-sans",
   display: "swap",
 });
 
-const fraunces = Fraunces({
+const notoSerif = Noto_Serif({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-serif",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "MandiSync | Crop Arbitrage Dashboard",
+  title: "MandiSync | Crop Price & Logistics Advisory",
   description:
-    "Indian mandi arbitrage routes with live Agmarknet prices where available, transit economics, and honest arrival guidance.",
+    "Independent advisory for Farmer Producer Organisations: Agmarknet wholesale prices, estimated haul costs, and destination mandi contacts.",
 };
 
 export default function RootLayout({
@@ -26,9 +26,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${sora.variable} ${fraunces.variable}`}>
+    <html lang="en" className={`${notoSans.variable} ${notoSerif.variable}`}>
       <head>
-        {/* Leaflet CSS via CDN — required for tile grids, controls, and marker chrome. */}
         <link
           rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -36,7 +35,7 @@ export default function RootLayout({
           crossOrigin=""
         />
       </head>
-      <body className="min-h-screen font-sans antialiased bg-slate-900 text-slate-100">
+      <body className="min-h-screen bg-[var(--paper)] font-sans text-[var(--ink)] antialiased">
         {children}
       </body>
     </html>

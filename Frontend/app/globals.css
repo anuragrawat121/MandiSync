@@ -3,7 +3,23 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
+  --ink: #1c1917;
+  --muted: #57534e;
+  --paper: #f4efe6;
+  --panel: #fffcf7;
+  --line: #d7d0c4;
+  --navy: #123a63;
+  --navy-dark: #0c2744;
+  --saffron: #c45c0a;
+  --green: #1b6b3a;
+  --link: #0d4f8c;
+  --danger: #9b1c1c;
+  --warn-bg: #f8eedc;
+  --warn-ink: #6b4a12;
+  --ok-bg: #e7f2ea;
+  --danger-bg: #f8e8e8;
+  --focus: #123a63;
 }
 
 html,
@@ -13,13 +29,337 @@ body {
 
 body {
   margin: 0;
-  background: #0f172a;
+  background: var(--paper);
+  color: var(--ink);
 }
 
-/* Map fills its sized parent; parent sets height for phone + desktop. */
+::selection {
+  background: #dce7f2;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.gov-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.gov-skip {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 80;
+  background: var(--navy-dark);
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.gov-skip:focus {
+  top: 0.5rem;
+}
+
+.gov-tricolor {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  height: 4px;
+}
+
+.gov-tricolor span:nth-child(1) {
+  background: #ff9933;
+}
+
+.gov-tricolor span:nth-child(2) {
+  background: #fff;
+}
+
+.gov-tricolor span:nth-child(3) {
+  background: #138808;
+}
+
+.gov-masthead {
+  background: var(--navy-dark);
+  color: #f4ead4;
+  border-bottom: 1px solid #1a3f63;
+}
+
+.gov-masthead-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+}
+
+.gov-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.gov-brand:hover {
+  text-decoration: none;
+  color: #fff;
+}
+
+.gov-brand-mark {
+  flex-shrink: 0;
+}
+
+.gov-brand-name {
+  display: block;
+  font-family: var(--font-serif), "Noto Serif", Georgia, serif;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.gov-brand-sub {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  color: #d4c7af;
+  letter-spacing: 0.02em;
+}
+
+.gov-nav {
+  display: flex;
+  gap: 0.15rem;
+  font-size: 0.875rem;
+}
+
+.gov-nav a {
+  color: #e8dcc6;
+  text-decoration: none;
+  padding: 0.4rem 0.7rem;
+  border-bottom: 2px solid transparent;
+}
+
+.gov-nav a:hover {
+  color: #fff;
+}
+
+.gov-nav a.is-active {
+  color: #fff;
+  border-bottom-color: #ff9933;
+}
+
+.gov-page {
+  flex: 1;
+  max-width: 72rem;
+  margin: 0 auto;
+  width: 100%;
+  padding: 1.25rem 1rem 2.5rem;
+}
+
+.gov-kicker {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.gov-title {
+  margin: 0.2rem 0 0;
+  font-family: var(--font-serif), "Noto Serif", Georgia, serif;
+  font-size: 1.65rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--navy-dark);
+}
+
+.gov-lede {
+  margin: 0.55rem 0 0;
+  max-width: 42rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.gov-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.gov-input,
+.gov-select,
+.gov-textarea {
+  width: 100%;
+  border: 1px solid #b7b0a4;
+  background: #fff;
+  color: var(--ink);
+  padding: 0.5rem 0.65rem;
+  font-size: 0.95rem;
+  border-radius: 2px;
+}
+
+.gov-input:focus,
+.gov-select:focus,
+.gov-textarea:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 1px var(--navy);
+  outline: none;
+}
+
+.gov-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 1px solid var(--navy);
+  background: #fff;
+  color: var(--navy);
+  padding: 0.45rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.gov-btn:hover {
+  background: #eef3f8;
+  color: var(--navy-dark);
+}
+
+.gov-btn-primary {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+}
+
+.gov-btn-primary:hover {
+  background: var(--navy-dark);
+  color: #fff;
+}
+
+.gov-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gov-btn-success {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.gov-btn-success:hover {
+  background: #155830;
+  color: #fff;
+}
+
+.gov-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.gov-notice {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 0.9rem 1rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: 2px;
+}
+
+.gov-notice-warn {
+  background: var(--warn-bg);
+  border-color: #e0c48a;
+  color: var(--warn-ink);
+}
+
+.gov-notice-error {
+  background: var(--danger-bg);
+  border-color: #e0b4b4;
+  color: var(--danger);
+}
+
+.gov-notice-ok {
+  background: var(--ok-bg);
+  border-color: #b5d4c0;
+  color: #14532d;
+}
+
+.gov-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.gov-money {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.gov-footer {
+  margin-top: auto;
+  border-top: 3px solid var(--navy);
+  background: #ebe4d6;
+  color: #3f3a34;
+}
+
+.gov-footer-inner {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 1.75rem;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.gov-footer p + p {
+  margin-top: 0.55rem;
+}
+
+.gov-footer a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.gov-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+}
+
 .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #0b1220;
+  background: #e8e4dc;
   font: inherit;
+  border-radius: 0;
+}
+
+.leaflet-tooltip {
+  font-family: inherit;
+  font-size: 0.75rem;
+  border-radius: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

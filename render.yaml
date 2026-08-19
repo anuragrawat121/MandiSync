@@ -20,6 +20,12 @@ services:
         value: "true"
       - key: RUN_INGEST_LOOP
         value: "true"
+      - key: INGEST_START_DELAY_SECONDS
+        value: "90"
+      - key: INGEST_RETRY_SECONDS
+        value: "1800"
+      - key: MAX_STALENESS_DAYS
+        value: "7"
       - key: ALLOW_SEED_FALLBACK
         value: "false"
       - key: DB_WAIT_SECONDS

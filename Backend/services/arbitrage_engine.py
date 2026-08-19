@@ -7,13 +7,14 @@ combining modal price spreads with PostGIS-derived road-distance transit costs.
 
 from __future__ import annotations
 
+import math
 import os
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
-from geoalchemy2.functions import ST_DistanceSphere, ST_X, ST_Y
+from geoalchemy2.functions import ST_X, ST_Y
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -31,6 +32,15 @@ def _allow_seed_fallback() -> bool:
         "yes",
         "on",
     }
+
+
+def _max_staleness_days(explicit: int | None = None) -> int:
+    if explicit is not None:
+        return explicit
+    raw = os.getenv("MAX_STALENESS_DAYS", "").strip()
+    if raw.isdigit():
+        return max(1, int(raw))
+    return DEFAULT_MAX_STALENESS_DAYS
 
 # Government e-NAM mandi directory (no per-mandi deep link — user picks state/APMC).
 ENAM_MANDI_PORTAL_URL = "https://enam.gov.in/web/apmc-contact-details"
@@ -54,7 +64,9 @@ ENAM_APMC_SEARCH: dict[str, str] = {
 }
 
 # Drop a mandi from pairing if its newest quote is older than this.
-DEFAULT_MAX_STALENESS_DAYS = 3
+# Agmarknet's public feed is a *current-day* snapshot; many APMCs do not
+# report every calendar day, so 3 days is too tight for weekends/holidays.
+DEFAULT_MAX_STALENESS_DAYS = 7
 
 # Realistic all-India commercial truck hire estimate (INR per km).
 TRUCK_RATE_PER_KM_INR = Decimal("25")
@@ -152,53 +164,47 @@ def _enam_search_label(mandi: Mandi, bundle: dict[str, Any]) -> str:
     return mandi.name.replace(" APMC", "").strip()
 
 
-def _maps_url_for(mandi: Mandi, db_session: Session) -> str | None:
-    bundle = _contact_bundle(mandi)
-    if bundle.get("maps_url"):
-        return str(bundle["maps_url"])
-    try:
-        latlng = _leaflet_latlng(db_session, mandi)
-    except ValueError:
-        return None
-    lat, lng = latlng
-    label = mandi.name.replace(" ", "+")
-    return f"https://maps.google.com/?q={lat},{lng}({label})"
-
-
-def _leaflet_latlng(db_session: Session, mandi: Mandi) -> list[float]:
-    """Extract [lat, lng] from a PostGIS POINT stored as (longitude, latitude)."""
-    longitude = db_session.scalar(select(ST_X(mandi.coordinates)))
-    latitude = db_session.scalar(select(ST_Y(mandi.coordinates)))
-    if longitude is None or latitude is None:
-        raise ValueError(f"Missing coordinates for mandi '{mandi.name}'.")
-    return [float(latitude), float(longitude)]
-
-
-def _kilometers_between(db_session: Session, source: Mandi, destination: Mandi) -> float:
-    """
-    Compute great-circle distance between two mandis in kilometers.
-
-    PostGIS steps:
-      1. Both mandi rows store WGS84 points (SRID 4326) in `coordinates`.
-      2. ST_DistanceSphere(geom_a, geom_b) returns the spherical surface
-         distance in *meters* (avoids degree-based ST_Distance on lon/lat).
-      3. Divide meters by 1000 to express the haul length in kilometers.
-    """
-    distance_meters = db_session.scalar(
-        select(ST_DistanceSphere(source.coordinates, destination.coordinates))
-    )
-    if distance_meters is None:
-        raise ValueError(
-            f"Unable to compute distance between '{source.name}' and '{destination.name}'."
+def _load_mandi_latlng(
+    db_session: Session,
+    mandis: list[Mandi],
+) -> dict[int, list[float]]:
+    """One round-trip: mandi_id -> [lat, lng] for Leaflet and haversine."""
+    ids = [mandi.id for mandi in mandis if mandi is not None]
+    if not ids:
+        return {}
+    rows = db_session.execute(
+        select(Mandi.id, ST_Y(Mandi.coordinates), ST_X(Mandi.coordinates)).where(
+            Mandi.id.in_(ids)
         )
-    return float(distance_meters) / 1000.0
+    ).all()
+    coords: dict[int, list[float]] = {}
+    for mandi_id, latitude, longitude in rows:
+        if latitude is None or longitude is None:
+            continue
+        coords[int(mandi_id)] = [float(latitude), float(longitude)]
+    return coords
+
+
+def _haversine_km(source: list[float], destination: list[float]) -> float:
+    """Great-circle km (WGS84 mean radius), matching ST_DistanceSphere closely."""
+    lat1, lon1 = source
+    lat2, lon2 = destination
+    radius_km = 6371.0088
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lon2 - lon1)
+    chord = (
+        math.sin(d_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
+    )
+    return 2 * radius_km * math.asin(min(1.0, math.sqrt(chord)))
 
 
 def _evaluate_pair(
-    db_session: Session,
     crop_name: str,
     source: CropPrice,
     destination: CropPrice,
+    coords: dict[int, list[float]],
 ) -> ArbitrageOpportunity | None:
     """
     Evaluate one source/destination price pair.
@@ -217,7 +223,12 @@ def _evaluate_pair(
     if gross_spread <= 0:
         return None
 
-    distance_km = _kilometers_between(db_session, source.mandi, destination.mandi)
+    source_xy = coords.get(source.mandi_id)
+    dest_xy = coords.get(destination.mandi_id)
+    if not source_xy or not dest_xy:
+        return None
+
+    distance_km = _haversine_km(source_xy, dest_xy)
 
     total_transit_cost = Decimal(str(distance_km)) * TRUCK_RATE_PER_KM_INR
     transit_cost_per_quintal = total_transit_cost / TRUCK_CAPACITY_QUINTALS
@@ -243,7 +254,11 @@ def _evaluate_pair(
 
     dest_bundle = _contact_bundle(destination.mandi)
     profile_url = dest_bundle.get("profile_url")
-    maps_url = _maps_url_for(destination.mandi, db_session)
+    maps_url = dest_bundle.get("maps_url")
+    if not maps_url:
+        lat, lng = dest_xy
+        label = destination.mandi.name.replace(" ", "+")
+        maps_url = f"https://maps.google.com/?q={lat},{lng}({label})"
 
     return ArbitrageOpportunity(
         crop_name=crop_name,
@@ -259,8 +274,8 @@ def _evaluate_pair(
         mandi_fee_per_quintal=round(float(mandi_fee_per_quintal), 2),
         perishability_cost_per_quintal=round(float(perishability_cost), 2),
         net_profit=round(float(net_profit), 2),
-        source_coordinates=_leaflet_latlng(db_session, source.mandi),
-        destination_coordinates=_leaflet_latlng(db_session, destination.mandi),
+        source_coordinates=source_xy,
+        destination_coordinates=dest_xy,
         destination_verified_agents=list(destination.mandi.verified_agents or []),
         destination_contacts=list(dest_bundle.get("contacts") or []),
         destination_profile_url=profile_url,
@@ -434,7 +449,7 @@ def _attach_agents(
 def calculate_crop_arbitrage(
     db_session: Session,
     crop_name: str,
-    max_staleness_days: int = DEFAULT_MAX_STALENESS_DAYS,
+    max_staleness_days: int | None = None,
 ) -> dict[str, Any]:
     """
     Find all profitable arbitrage routes for ``crop_name``.
@@ -449,6 +464,7 @@ def calculate_crop_arbitrage(
         "max_staleness_days": int,
       }
     """
+    max_staleness_days = _max_staleness_days(max_staleness_days)
     prices: list[CropPrice] = (
         db_session.execute(
             select(CropPrice)
@@ -482,6 +498,11 @@ def calculate_crop_arbitrage(
 
     agents_status = "unavailable" if data_source_used == "agmarknet" else "demo"
 
+    coords = _load_mandi_latlng(
+        db_session,
+        [row.mandi for row in prices if row.mandi is not None],
+    )
+
     opportunities: list[ArbitrageOpportunity] = []
 
     for source in prices:
@@ -489,7 +510,9 @@ def calculate_crop_arbitrage(
             if source.mandi_id == destination.mandi_id:
                 continue
 
-            opportunity = _evaluate_pair(db_session, crop_name, source, destination)
+            opportunity = _evaluate_pair(
+                crop_name, source, destination, coords
+            )
             if opportunity is not None:
                 opportunities.append(opportunity)
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-import { API_BASE_URL, apiHeaders, type ArbitrageRoute } from "@/lib/types";
+import { apiHeaders, type ArbitrageRoute } from "@/lib/types";
+import { apiRoot } from "@/lib/apiClient";
 
 type Props = {
   route: ArbitrageRoute;
@@ -24,7 +25,7 @@ export default function AgentIntroForm({ route }: Props) {
     setFeedback("");
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/leads/agent-intro`, {
+      const response = await fetch(`${apiRoot()}/api/leads/agent-intro`, {
         method: "POST",
         headers: apiHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({
@@ -62,78 +63,75 @@ export default function AgentIntroForm({ route }: Props) {
   return (
     <form
       onSubmit={(event) => void handleSubmit(event)}
-      className="mt-4 rounded-xl border border-slate-700/80 bg-slate-900/60 p-4"
+      className="gov-card mt-4 p-4"
     >
-      <p className="text-xs uppercase tracking-[0.16em] text-sky-400">
-        Request agent intro
-      </p>
-      <p className="mt-1 text-sm leading-relaxed text-slate-400">
-        No verified commission agent listed yet? Leave your number and we will
-        queue a partner follow-up for{" "}
-        <span className="text-slate-200">{route.destination_mandi}</span>.
-      </p>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm">
-          <span className="text-slate-400">Your name</span>
-          <input
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 outline-none ring-sky-400/0 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
-            placeholder="Ram Singh"
-            maxLength={128}
-          />
-        </label>
-        <label className="block text-sm">
-          <span className="text-slate-400">Mobile number</span>
-          <input
-            required
-            type="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(event) => setPhone(event.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
-            placeholder="9876543210"
-            maxLength={20}
-          />
-        </label>
-      </div>
-
-      <label className="mt-3 block text-sm">
-        <span className="text-slate-400">Notes (optional)</span>
-        <textarea
-          value={notes}
-          onChange={(event) => setNotes(event.target.value)}
-          rows={2}
-          maxLength={500}
-          placeholder="Approx. quintals, arrival date, preferred language…"
-          className="mt-1 w-full resize-none rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-400/30"
-        />
-      </label>
-
-      <button
-        type="submit"
-        disabled={formState === "submitting"}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {formState === "submitting" ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Send className="h-4 w-4" />
-        )}
-        Request intro at destination
-      </button>
-
-      {feedback && (
-        <p
-          className={`mt-3 text-sm ${
-            formState === "success" ? "text-emerald-300" : "text-amber-200"
-          }`}
-        >
-          {feedback}
+      <fieldset>
+        <legend className="gov-kicker">Request an introduction</legend>
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+          No verified commission agent listed yet? Leave your number and we will
+          queue a follow-up for {route.destination_mandi}.
         </p>
-      )}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="gov-label">Your name</span>
+            <input
+              required
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="gov-input"
+              placeholder="Ram Singh"
+              maxLength={128}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="gov-label">Mobile number</span>
+            <input
+              required
+              type="tel"
+              inputMode="tel"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
+              className="gov-input"
+              placeholder="9876543210"
+              maxLength={20}
+            />
+          </label>
+        </div>
+
+        <label className="mt-3 block text-sm">
+          <span className="gov-label">Notes (optional)</span>
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Approx. quintals, arrival date, preferred language"
+            className="gov-textarea"
+          />
+        </label>
+
+        <button
+          type="submit"
+          disabled={formState === "submitting"}
+          className="gov-btn gov-btn-primary mt-4"
+        >
+          {formState === "submitting" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : null}
+          Submit request
+        </button>
+
+        {feedback && (
+          <p
+            className={`mt-3 text-sm ${
+              formState === "success" ? "text-[var(--green)]" : "text-[var(--danger)]"
+            }`}
+          >
+            {feedback}
+          </p>
+        )}
+      </fieldset>
     </form>
   );
 }

@@ -66,6 +66,7 @@ postgresql://postgres:YOUR_PASSWORD@db.xxxxx.supabase.co:5432/postgres
 | `ALLOW_SEED_FALLBACK` | `false` |
 | `SKIP_DB_INIT_ON_IMPORT` | `true` |
 | `RUN_INGEST_LOOP` | `true` |
+| `INGEST_START_DELAY_SECONDS` | `90` |
 | `PYTHONPATH` | `.` |
 | `DB_WAIT_SECONDS` | `180` |
 
@@ -121,7 +122,9 @@ Admin: `https://anuragrawat121.github.io/MandiSync/admin/`
 - [ ] Render web service **Free**, root `Backend`, `/health` OK
 - [ ] GitHub Actions secrets point at the Render URL
 - [ ] Pages source = GitHub Actions
-- [ ] Site loads (wait up to a minute on first try)
+- [ ] Site loads (first visit after idle can take 1–2 minutes; later visits should be fast)
+
+A GitHub Action pings `/health` every 10 minutes so Render sleeps less often. It uses the same `NEXT_PUBLIC_API_BASE_URL` secret as Pages.
 
 ---
 
@@ -129,7 +132,7 @@ Admin: `https://anuragrawat121.github.io/MandiSync/admin/`
 
 | Thing | What happens |
 |-------|----------------|
-| Render free | Sleeps after ~15 min idle; next visit is slow |
+| Render free | Sleeps after ~15 min idle; next visit can take 1–2 minutes unless the keep-alive workflow is running |
 | Supabase free | Pauses after ~7 days unused; click Resume |
 | Hugging Face Docker/Gradio | **Paid** — skip |
 | Live Agmarknet prices | Need `AGMARKNET_API_KEY` when data.gov.in is back |

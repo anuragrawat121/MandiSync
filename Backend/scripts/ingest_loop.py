@@ -9,14 +9,15 @@ import time
 from datetime import datetime, timezone
 
 
-def run_ingest() -> None:
+def run_ingest() -> int:
     print(
         f"[ingest-loop] {datetime.now(timezone.utc).isoformat()} starting ingest…",
         flush=True,
     )
     code = subprocess.call([sys.executable, "ingest_prices.py", "--ingest"])
     if code != 0:
-        print(f"[ingest-loop] ingest exited {code}; will retry next cycle", flush=True)
+        print(f"[ingest-loop] ingest exited {code}; will retry sooner", flush=True)
+    return code
 
 
 def main() -> None:
@@ -25,14 +26,21 @@ def main() -> None:
     os.environ["PYTHONPATH"] = root
     subprocess.check_call([sys.executable, "scripts/wait_for_db.py"])
     subprocess.call([sys.executable, "scripts/enable_postgis.py"])
-    print("[ingest-loop] Running initial Agmarknet ingest…", flush=True)
-    run_ingest()
+    warmup = int(os.getenv("INGEST_START_DELAY_SECONDS", "0"))
+    if warmup > 0:
+        print(
+            f"[ingest-loop] waiting {warmup}s so the API can finish waking…",
+            flush=True,
+        )
+        time.sleep(warmup)
 
     interval = int(os.getenv("INGEST_INTERVAL_SECONDS", "86400"))
-    print(f"[ingest-loop] Sleeping {interval}s between runs…", flush=True)
+    retry = int(os.getenv("INGEST_RETRY_SECONDS", "1800"))
     while True:
-        time.sleep(interval)
-        run_ingest()
+        code = run_ingest()
+        wait = interval if code == 0 else retry
+        print(f"[ingest-loop] Sleeping {wait}s between runs…", flush=True)
+        time.sleep(wait)
 
 
 if __name__ == "__main__":
